@@ -4,4 +4,6 @@ import rx.Observable;
 
 public interface DeviceConnection {
   <T> Observable<T> observe(Param<T> pid);
+
+  Observable<Void> resetDtcs();
 }

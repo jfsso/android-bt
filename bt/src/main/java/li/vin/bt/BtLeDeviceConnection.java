@@ -92,6 +92,49 @@ import rx.subscriptions.Subscriptions;
     this.descriptorWriteObservable.onNext(new DescriptorWriteMsg(gatt, descriptor, status));
   }
 
+  @Override public Observable<Void> resetDtcs() {
+    final ConnectableObservable<Void> clearDtcsObservable = connectionObservable
+      .flatMap(new Func1<GattService, Observable<Void>>() {
+        @Override public Observable<Void> call(final GattService gs) {
+          return Observable.create(new Observable.OnSubscribe<Void>() {
+            @Override public void call(Subscriber<? super Void> subscriber) {
+              final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(Uuids.CLEAR_DTCS);
+              if (characteristic == null) {
+                throw new RuntimeException("bluetooth service is missing the CLEAR_DTCS characteristic");
+              }
+
+              if (gs.gatt.writeCharacteristic(characteristic)) {
+                subscriber.onNext(null);
+                subscriber.onCompleted();
+              } else {
+                subscriber.onError(new RuntimeException("failed to initiate write to clear DTCs"));
+              }
+            }
+          }).flatMap(new Func1<Void, Observable<Void>>() {
+            @Override public Observable<Void> call(Void aVoid) {
+              return characteristicWriteObservable
+                .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
+                  @Override public Boolean call(CharacteristicWriteMsg msg) {
+                    return Uuids.CLEAR_DTCS.equals(msg.characteristic.getUuid());
+                  }
+                })
+                .first()
+                .map(new Func1<CharacteristicWriteMsg, Void>() {
+                  @Override public Void call(CharacteristicWriteMsg characteristicWriteMsg) {
+                    return null;
+                  }
+                });
+            }
+          });
+        }
+      })
+      .publish();
+
+    writeQueue.onNext(clearDtcsObservable);
+
+    return clearDtcsObservable.asObservable();
+  }
+
   @Override public <T> Observable<T> observe(final Param<T> param) {
     if (param == null) {
       throw new IllegalArgumentException("param == null");

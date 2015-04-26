@@ -4,7 +4,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 
 import java.util.UUID;
 
-/*package*/ abstract class ParamPlain<T> extends Param<T, String> {
+/*package*/ abstract class ParamPlain<T> extends ParamImpl<T, String> {
   public ParamPlain(UUID uuid) {
     super(uuid);
   }

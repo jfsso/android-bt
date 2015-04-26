@@ -5,7 +5,7 @@ import android.util.Log;
 
 import java.util.UUID;
 
-/*package*/ abstract class ParamStream<T> extends Param<T, String> {
+/*package*/ abstract class ParamStream<T> extends ParamImpl<T, String> {
   protected static final int HEX = 16;
 
   private final String mCode;

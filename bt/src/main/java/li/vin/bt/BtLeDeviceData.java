@@ -38,7 +38,7 @@ import rx.subscriptions.Subscriptions;
   private final PublishSubject<ConnectableObservable<?>> writeQueue = PublishSubject.create();
 
   private final Map<UUID, Observable<?>> mUuidObservables = new ConcurrentHashMap<>();
-  private final Map<Param<?, ?>, Observable<?>> mPidObservables = new IdentityHashMap<>();
+  private final Map<Param<?>, Observable<?>> mPidObservables = new IdentityHashMap<>();
 
   private final Context mContext;
   private final BluetoothDevice mDevice;
@@ -92,15 +92,22 @@ import rx.subscriptions.Subscriptions;
     this.descriptorWriteObservable.onNext(new DescriptorWriteMsg(gatt, descriptor, status));
   }
 
-  @Override public ObdPair getLatest(final Param<?, ?> pid) {
+  @Override public ObdPair getLatest(final Param<?> pid) {
     throw new UnsupportedOperationException("getLatest is not yet implemented");
   }
 
-  @Override public <T, P> Observable<T> observe(final Param<T, P> pid) {
+  @Override public <T> Observable<T> observe(final Param<T> pid) {
     if (pid == null) {
       throw new IllegalArgumentException("pid == null");
     }
+    if (!(pid instanceof ParamImpl)) {
+      throw new AssertionError("all Params must be instances of ParamImpl");
+    }
 
+    return observe((ParamImpl<T, ?>) pid);
+  }
+
+  private <T, P> Observable<T> observe(final ParamImpl<T, P> pid) {
     @SuppressWarnings("unchecked")
     Observable<T> pidObservable = (Observable<T>) mPidObservables.get(pid);
     if (pidObservable == null) {
@@ -373,7 +380,7 @@ import rx.subscriptions.Subscriptions;
     }
   }
 
-  private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final Param<?, ?> pid,
+  private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final ParamImpl<?, ?> pid,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
@@ -403,7 +410,7 @@ import rx.subscriptions.Subscriptions;
     }).publish();
   }
 
-  private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final Param<?, ?> pid,
+  private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> pid,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
@@ -454,7 +461,7 @@ import rx.subscriptions.Subscriptions;
     }).publish();
   }
 
-  private ConnectableObservable<? extends Object> makeStopNotiObservable(final Param<?, ?> pid,
+  private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> pid,
       final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {

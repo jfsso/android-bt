@@ -2,7 +2,7 @@ package li.vin.bt;
 
 import android.bluetooth.BluetoothGattCharacteristic;
 
-/*package*/ abstract class ParamAccel<T> extends Param<T, byte[]> {
+/*package*/ abstract class ParamAccel<T> extends ParamImpl<T, byte[]> {
   protected static final float ACCEL_CONVERT = 9.81f / 64;
 
   public ParamAccel() {

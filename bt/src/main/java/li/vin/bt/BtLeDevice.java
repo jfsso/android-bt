@@ -25,7 +25,7 @@ import android.os.Parcelable;
   }
 
   public DeviceConnection createDeviceConnection(Context context, String unlockKey) {
-    return new BtLeDeviceData(context, mDevice, unlockKey);
+    return new BtLeDeviceConnection(context, mDevice, unlockKey);
   }
 
   @Override public void writeToParcel(Parcel out, int flags) {

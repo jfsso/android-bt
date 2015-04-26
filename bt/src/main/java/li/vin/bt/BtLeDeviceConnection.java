@@ -25,8 +25,8 @@ import rx.observables.ConnectableObservable;
 import rx.subjects.PublishSubject;
 import rx.subscriptions.Subscriptions;
 
-/*package*/ class BtLeDeviceData extends BluetoothGattCallback implements DeviceConnection {
-  private static final String TAG = BtLeDeviceData.class.getSimpleName();
+/*package*/ class BtLeDeviceConnection extends BluetoothGattCallback implements DeviceConnection {
+  private static final String TAG = BtLeDeviceConnection.class.getSimpleName();
 
   private final PublishSubject<ConnectionStateChangeMsg> connectionStateObservable = PublishSubject.create();
   private final PublishSubject<ServiceMsg> serviceObservable = PublishSubject.create();
@@ -44,7 +44,7 @@ import rx.subscriptions.Subscriptions;
   private final BluetoothDevice mDevice;
   private final String mUnlockKey;
 
-  public BtLeDeviceData(Context context, BluetoothDevice device, String unlockKey) {
+  public BtLeDeviceConnection(Context context, BluetoothDevice device, String unlockKey) {
     mContext = context;
     mDevice = device;
     mUnlockKey = unlockKey;
@@ -226,7 +226,7 @@ import rx.subscriptions.Subscriptions;
 
   private final Observable.OnSubscribe<Void> startGattOnSubscribe = new Observable.OnSubscribe<Void>()  {
     @Override public void call(Subscriber<? super Void> subscriber) {
-      final BluetoothGatt gatt = mDevice.connectGatt(mContext, false, BtLeDeviceData.this);
+      final BluetoothGatt gatt = mDevice.connectGatt(mContext, false, BtLeDeviceConnection.this);
       final Subscription writeQueueSubscription = writeQueue
         .onBackpressureBuffer()
         .subscribe(new WriteQueueConsumer());

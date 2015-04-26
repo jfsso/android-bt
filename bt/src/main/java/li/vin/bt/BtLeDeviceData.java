@@ -38,7 +38,7 @@ import rx.subscriptions.Subscriptions;
   private final PublishSubject<ConnectableObservable<?>> writeQueue = PublishSubject.create();
 
   private final Map<UUID, Observable<?>> mUuidObservables = new ConcurrentHashMap<>();
-  private final Map<Param<?>, Observable<?>> mPidObservables = new IdentityHashMap<>();
+  private final Map<Param<?>, Observable<?>> mParamObservables = new IdentityHashMap<>();
 
   private final Context mContext;
   private final BluetoothDevice mDevice;
@@ -96,50 +96,50 @@ import rx.subscriptions.Subscriptions;
     throw new UnsupportedOperationException("getLatest is not yet implemented");
   }
 
-  @Override public <T> Observable<T> observe(final Param<T> pid) {
-    if (pid == null) {
-      throw new IllegalArgumentException("pid == null");
+  @Override public <T> Observable<T> observe(final Param<T> param) {
+    if (param == null) {
+      throw new IllegalArgumentException("param == null");
     }
-    if (!(pid instanceof ParamImpl)) {
+    if (!(param instanceof ParamImpl)) {
       throw new AssertionError("all Params must be instances of ParamImpl");
     }
 
-    return observe((ParamImpl<T, ?>) pid);
+    return observe((ParamImpl<T, ?>) param);
   }
 
-  private <T, P> Observable<T> observe(final ParamImpl<T, P> pid) {
+  private <T, P> Observable<T> observe(final ParamImpl<T, P> param) {
     @SuppressWarnings("unchecked")
-    Observable<T> pidObservable = (Observable<T>) mPidObservables.get(pid);
-    if (pidObservable == null) {
+    Observable<T> paramObservable = (Observable<T>) mParamObservables.get(param);
+    if (paramObservable == null) {
       @SuppressWarnings("unchecked")
-      Observable<P> uuidObservable = (Observable<P>) mUuidObservables.get(pid.uuid);
+      Observable<P> uuidObservable = (Observable<P>) mUuidObservables.get(param.uuid);
       if (uuidObservable == null) {
         final Func1<BluetoothGattCharacteristic, Boolean> matchesUuid = new Func1<BluetoothGattCharacteristic, Boolean>() {
           @Override public Boolean call(BluetoothGattCharacteristic characteristic) {
-            return pid.uuid.equals(characteristic.getUuid());
+            return param.uuid.equals(characteristic.getUuid());
           }
         };
 
         final Func1<BluetoothGattCharacteristic, P> parseCharacteristic = new Func1<BluetoothGattCharacteristic, P>() {
           @Override public P call(BluetoothGattCharacteristic characteristic) {
-            return pid.parseCharacteristic(characteristic);
+            return param.parseCharacteristic(characteristic);
           }
         };
 
         uuidObservable = connectionObservable
           .flatMap(new Func1<GattService, Observable<BluetoothGattCharacteristic>>() {
             @Override public Observable<BluetoothGattCharacteristic> call(final GattService gs) {
-              final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(pid.uuid);
+              final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(param.uuid);
               if (characteristic == null) {
-                throw new RuntimeException("no such characteristic: " + pid.uuid);
+                throw new RuntimeException("no such characteristic: " + param.uuid);
               }
 
-              final ConnectableObservable<BluetoothGattCharacteristic> readObservable = pid.shouldRead
-                ? makeReadObservable(pid, gs.gatt, characteristic)
+              final ConnectableObservable<BluetoothGattCharacteristic> readObservable = param.shouldRead
+                ? makeReadObservable(param, gs.gatt, characteristic)
                 : null;
 
-              final ConnectableObservable<DescriptorWriteMsg> notiObservable = pid.hasNotifications
-                ? makeNotiObservable(pid, gs.gatt, characteristic)
+              final ConnectableObservable<DescriptorWriteMsg> notiObservable = param.hasNotifications
+                ? makeNotiObservable(param, gs.gatt, characteristic)
                 : null;
 
 
@@ -172,43 +172,44 @@ import rx.subscriptions.Subscriptions;
 
         uuidObservable.doOnUnsubscribe(new Action0() {
           @Override public void call() {
-            Log.d("uuid.doOnUnsubscribe", "unsubscribing " + pid.uuid);
-            mUuidObservables.remove(pid.uuid);
+            Log.d("uuid.doOnUnsubscribe", "unsubscribing " + param.uuid);
+            mUuidObservables.remove(param.uuid);
           }
         });
 
-        mUuidObservables.put(pid.uuid, uuidObservable);
+        mUuidObservables.put(param.uuid, uuidObservable);
       }
 
       final Func1<P, Boolean> matchesParsed = new Func1<P, Boolean>() {
         @Override public Boolean call(P s) {
-          return pid.matches(s);
+          return param.matches(s);
         }
       };
 
       final Func1<P, T> parseVal = new Func1<P, T>() {
         @Override public T call(P s) {
-          return pid.parseVal(s);
+          return param.parseVal(s);
         }
       };
 
-      pidObservable = uuidObservable
+      paramObservable = uuidObservable
         .filter(matchesParsed)
         .map(parseVal)
         .distinctUntilChanged()
         .share();
 
-      pidObservable.doOnUnsubscribe(new Action0() {
-        @Override public void call() {
-          Log.d("pid.doOnUnsubscribe", "unsubscribing " + pid.uuid);
-          mPidObservables.remove(pid);
+      paramObservable.doOnUnsubscribe(new Action0() {
+        @Override
+        public void call() {
+          Log.d("param.doOnUnsubscribe", "unsubscribing " + param.uuid);
+          mParamObservables.remove(param);
         }
       });
 
-      mPidObservables.put(pid, pidObservable);
+      mParamObservables.put(param, paramObservable);
     }
 
-    return pidObservable;
+    return paramObservable;
   }
 
   private final Func1<Object, Observable<CharacteristicChangeMsg>> getCharacteristicChanges = new Func1<Object, Observable<CharacteristicChangeMsg>>() {
@@ -380,7 +381,7 @@ import rx.subscriptions.Subscriptions;
     }
   }
 
-  private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final ParamImpl<?, ?> pid,
+  private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
@@ -388,7 +389,7 @@ import rx.subscriptions.Subscriptions;
           subscriber.onNext(null);
           subscriber.onCompleted();
         } else {
-          subscriber.onError(new RuntimeException("failed to initiate read of characteristic " + pid.uuid));
+          subscriber.onError(new RuntimeException("failed to initiate read of characteristic " + param.uuid));
         }
       }
     }).flatMap(new Func1<Void, Observable<BluetoothGattCharacteristic>>() {
@@ -396,21 +397,21 @@ import rx.subscriptions.Subscriptions;
         return characteristicReadObservable
           .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
             @Override public Boolean call(BluetoothGattCharacteristic chara) {
-              Log.i("makeReadObservable", "comparing " + pid.uuid + " to " + chara.getUuid());
-              return pid.uuid.equals(chara.getUuid());
+              Log.i("makeReadObservable", "comparing " + param.uuid + " to " + chara.getUuid());
+              return param.uuid.equals(chara.getUuid());
             }
           })
           .first()
           /*.doOnNext(new Action1<BluetoothGattCharacteristic>() {
             @Override public void call(BluetoothGattCharacteristic characteristic) {
-              Log.i("makeReadObservable", "finished read of " + pid.uuid);
+              Log.i("makeReadObservable", "finished read of " + param.uuid);
             }
           })*/;
       }
     }).publish();
   }
 
-  private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> pid,
+  private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
@@ -427,9 +428,9 @@ import rx.subscriptions.Subscriptions;
                 gatt.setCharacteristicNotification(characteristic, false);
 
                 final ConnectableObservable<? extends Object> stopNotiObservable =
-                  makeStopNotiObservable(pid, gatt, descriptor);
+                  makeStopNotiObservable(param, gatt, descriptor);
 
-                Log.d("ChangeSubscriber", "queuing notification stop for " + pid.uuid);
+                Log.d("ChangeSubscriber", "queuing notification stop for " + param.uuid);
                 writeQueue.onNext(stopNotiObservable);
               }
             }));
@@ -441,27 +442,27 @@ import rx.subscriptions.Subscriptions;
           }
         }
 
-        subscriber.onError(new RuntimeException("failed to initiate streaming for characteristic " + pid.uuid));
+        subscriber.onError(new RuntimeException("failed to initiate streaming for characteristic " + param.uuid));
       }
     }).flatMap(new Func1<Void, Observable<DescriptorWriteMsg>>() {
       @Override public Observable<DescriptorWriteMsg> call(Void aVoid) {
         return descriptorWriteObservable
           .filter(new Func1<DescriptorWriteMsg, Boolean>() {
             @Override public Boolean call(DescriptorWriteMsg msg) {
-              return pid.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
+              return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
             }
           })
           .first()
           /*.doOnNext(new Action1<DescriptorWriteMsg>() {
             @Override public void call(DescriptorWriteMsg msg) {
-              Log.i("SubscribeToChanges", "enabled notifications for " + pid.uuid);
+              Log.i("SubscribeToChanges", "enabled notifications for " + param.uuid);
             }
           })*/;
       }
     }).publish();
   }
 
-  private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> pid,
+  private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
@@ -470,7 +471,7 @@ import rx.subscriptions.Subscriptions;
           subscriber.onNext(null);
           subscriber.onCompleted();
         } else {
-          subscriber.onError(new RuntimeException("failed to initiate stopping of notifications for " + pid.uuid));
+          subscriber.onError(new RuntimeException("failed to initiate stopping of notifications for " + param.uuid));
         }
       }
     }).flatMap(new Func1<Void, Observable<?>>() {
@@ -478,13 +479,13 @@ import rx.subscriptions.Subscriptions;
         return descriptorWriteObservable
           .filter(new Func1<DescriptorWriteMsg, Boolean>() {
             @Override public Boolean call(DescriptorWriteMsg msg) {
-              return pid.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
+              return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
             }
           })
           .first()
           /*.doOnNext(new Action1<DescriptorWriteMsg>() {
             @Override public void call(DescriptorWriteMsg msg) {
-              Log.i("SubscribeToChanges", "finished turning off notifications for " + pid.uuid);
+              Log.i("SubscribeToChanges", "finished turning off notifications for " + param.uuid);
             }
           })*/;
       }

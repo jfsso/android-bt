@@ -9,13 +9,13 @@ import java.util.UUID;
   /**
    * Attribute to write anything to to clear the DTCs
    */
-  public static final UUID CLEAR_DTC = UUID.fromString("00f8e5ab-f0d3-42f7-bc42-de3696b0a522");
+  public static final UUID CLEAR_DTCS = UUID.fromString("00f8e5ab-f0d3-42f7-bc42-de3696b0a522");
 
   /**
    * Diagnostic Trouble Codes<br>
    * format: D:P0100,P0200,P0300,U0100... ect
    */
-  public static final UUID DTC_CODES = UUID.fromString("82e6de6b-b610-455e-bf53-0166f4d6e493");
+  public static final UUID DTCS = UUID.fromString("82e6de6b-b610-455e-bf53-0166f4d6e493");
 
   /**
    * BLE113 Serial Number<br>

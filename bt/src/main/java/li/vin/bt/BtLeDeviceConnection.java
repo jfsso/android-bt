@@ -92,10 +92,6 @@ import rx.subscriptions.Subscriptions;
     this.descriptorWriteObservable.onNext(new DescriptorWriteMsg(gatt, descriptor, status));
   }
 
-  @Override public ObdPair getLatest(final Param<?> pid) {
-    throw new UnsupportedOperationException("getLatest is not yet implemented");
-  }
-
   @Override public <T> Observable<T> observe(final Param<T> param) {
     if (param == null) {
       throw new IllegalArgumentException("param == null");

@@ -73,6 +73,7 @@ public final class VinliDevices {
 
         final Handler handler = new Handler();
         handler.postDelayed(timeoutListener, scanTimeout);
+        adapter.startLeScan(listener);
 
         subscriber.add(Subscriptions.create(new Action0() {
           @Override public void call() {

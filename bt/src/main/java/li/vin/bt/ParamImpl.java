@@ -5,7 +5,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import java.nio.charset.Charset;
 import java.util.UUID;
 
-public abstract class ParamImpl<Output, Input> extends Param<Output> {
+/*package*/ abstract class ParamImpl<Output, Input> extends Param<Output> {
   protected static final Charset ASCII = Charset.forName("ASCII");
 
   /*package*/ final UUID uuid;

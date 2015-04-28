@@ -462,7 +462,15 @@ import rx.subscriptions.Subscriptions;
           final BluetoothGattDescriptor descriptor =
             characteristic.getDescriptor(Uuids.CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID);
 
-          descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+          // different Bluetooth Profile implementations support updates via either notification or indication.
+          // detect which this device supports and use it.
+          final int propNoti = BluetoothGattCharacteristic.PROPERTY_NOTIFY;
+
+          final byte[] enableNotificationsValue = (characteristic.getProperties() & propNoti) == propNoti
+            ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            : BluetoothGattDescriptor.ENABLE_INDICATION_VALUE;
+
+          descriptor.setValue(enableNotificationsValue);
 
           if (gatt.writeDescriptor(descriptor)) {
             subscriber.add(Subscriptions.create(new Action0() {
@@ -509,7 +517,7 @@ import rx.subscriptions.Subscriptions;
       final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(Subscriber<? super Void> subscriber) {
-        descriptor.setValue(new byte[] { 0x00, 0x00 });
+        descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
         if (gatt.writeDescriptor(descriptor)) {
           subscriber.onNext(null);
           subscriber.onCompleted();

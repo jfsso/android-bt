@@ -64,9 +64,21 @@ public final class VinliDevices {
           }
         };
 
+        final Action0 stopScan = new Action0() {
+          private boolean called = false;
+
+          @Override public void call() {
+            if (!called) {
+              adapter.stopLeScan(listener);
+              called = true;
+            }
+          }
+        };
+
         final Runnable timeoutListener = new Runnable() {
           @Override public void run() {
-            adapter.stopLeScan(listener);
+            Log.d(TAG, "device scanned timed out");
+            stopScan.call();
             subscriber.onCompleted();
           }
         };
@@ -77,7 +89,8 @@ public final class VinliDevices {
 
         subscriber.add(Subscriptions.create(new Action0() {
           @Override public void call() {
-            adapter.stopLeScan(listener);
+            Log.d(TAG, "all unsubscribed from device scan");
+            stopScan.call();
             handler.removeCallbacks(timeoutListener);
           }
         }));

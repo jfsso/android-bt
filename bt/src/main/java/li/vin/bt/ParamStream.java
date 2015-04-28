@@ -31,12 +31,18 @@ import java.util.UUID;
 
 //      Log.d("parseCharacteristic", new String(val, 0, val.length, ASCII));
 
+    int valStart = 2;
     if (val[0] != '4' || val[1] != '1') {
-      throw new RuntimeException("streaming characteristic did not start with 41. Was instead: " + new String(val, 0, 2, ASCII));
+      if (val[0] == '\n' && val[1] == '4' && val[2] == '1') {
+        Log.d("ParamStream", "first char was newline");
+        valStart += 1;
+      } else {
+        throw new RuntimeException("streaming characteristic did not start with 41. Was instead: " + new String(val, 0, val.length, ASCII));
+      }
     }
 
     int valLen = 0;
-    for (int i = 0; i < val.length; i++) {
+    for (int i = valStart; i < val.length; i++) {
       final byte c = val[i];
       if (c == '\r' || c == 0) {
         break;
@@ -48,7 +54,7 @@ import java.util.UUID;
       throw new RuntimeException("valLen == 0");
     }
 
-    return new String(val, 2, valLen - 2, ASCII);
+    return new String(val, valStart, valLen, ASCII);
   }
 
   @Override public Boolean matches(final String val) {

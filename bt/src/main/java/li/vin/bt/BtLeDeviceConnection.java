@@ -311,9 +311,13 @@ import rx.subscriptions.Subscriptions;
 
   private final Func1<Void, Observable<Void>> waitForConnection = new Func1<Void, Observable<Void>>() {
     @Override public Observable<Void> call(Void aVoid) {
+      // leave a subscriber on the gatt observable. not leaving this can lead to a
+      // race condition in which the gatt observable thinks all subscribers
+      // have unsubscribed because a ConnectableObservable from the write queue
+      // has not yet been connected.
       return connectionStateObservable
         .lift(waitForConnectionOperator)
-        .first();
+        /*.first()*/;
     }
   };
 

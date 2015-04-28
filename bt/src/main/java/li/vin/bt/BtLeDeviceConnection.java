@@ -73,8 +73,8 @@ import rx.subscriptions.Subscriptions;
   }
 
   @Override public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-    Log.i(TAG, String.format("device(%s) onCharacteristicChanged characteristic(%s)",
-      gatt.getDevice(), characteristic.getUuid()));
+//    Log.i(TAG, String.format("device(%s) onCharacteristicChanged characteristic(%s)",
+//      gatt.getDevice(), characteristic.getUuid()));
     this.characteristicChangedObservable.onNext(new CharacteristicChangeMsg(gatt, characteristic));
   }
 

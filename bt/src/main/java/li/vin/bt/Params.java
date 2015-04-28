@@ -116,5 +116,5 @@ public final class Params {
 
   public static final Param<String> VIN = new ParamString(Uuids.VIN, false, true);
 
-  private Params() {}
+  private Params() { }
 }

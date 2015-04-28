@@ -8,9 +8,11 @@ import java.util.UUID;
 /*package*/ abstract class ParamImpl<Output, Input> extends Param<Output> {
   protected static final Charset ASCII = Charset.forName("ASCII");
 
+  // CHECKSTYLE.OFF: VisibilityModifier
   /*package*/ final UUID uuid;
   /*package*/ final boolean hasNotifications;
   /*package*/ final boolean shouldRead;
+  // CHECKSTYLE.ON: VisibilityModifier
 
   /*package*/ ParamImpl(UUID uuid) {
     this(uuid, true, false);

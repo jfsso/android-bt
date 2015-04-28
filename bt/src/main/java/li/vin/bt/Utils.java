@@ -29,5 +29,5 @@ import android.bluetooth.BluetoothProfile;
     }
   }
 
-  private Utils() {}
+  private Utils() { }
 }

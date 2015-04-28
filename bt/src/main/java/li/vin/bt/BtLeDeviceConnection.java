@@ -396,8 +396,8 @@ import rx.subscriptions.Subscriptions;
     .share();
 
   private static final class WriteQueueConsumer extends Subscriber<ConnectableObservable<?>> {
-    @Override public void onCompleted() {}
-    @Override public void onError(Throwable e) {}
+    @Override public void onCompleted() { }
+    @Override public void onError(Throwable e) { }
 
     @Override public void onStart() {
       request(1);
@@ -407,7 +407,7 @@ import rx.subscriptions.Subscriptions;
       Log.i("WriteQueue", "consuming next item");
 
       connectableObservable.subscribe(new Subscriber<Object>() {
-        @Override public void onNext(Object whatevs) {}
+        @Override public void onNext(Object whatevs) { }
 
         @Override public void onError(Throwable e) {
           Log.d("requestNext", "requesting next writeQueue item");
@@ -544,7 +544,9 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class ConnectionStateChangeMsg {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
+    // CHECKSTYLE.ON
     public final int status;
     public final int newState;
 
@@ -556,7 +558,9 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class ServiceMsg {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
+    // CHECKSTYLE.ON
     public final int status;
 
     public ServiceMsg(BluetoothGatt gatt, int status) {
@@ -566,8 +570,10 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class CharacteristicChangeMsg {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
     public final BluetoothGattCharacteristic characteristic;
+    // CHECKSTYLE.ON
 
     public CharacteristicChangeMsg(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
       this.gatt = gatt;
@@ -576,8 +582,10 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class CharacteristicWriteMsg {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
     public final BluetoothGattCharacteristic characteristic;
+    // CHECKSTYLE.ON
     public final int status;
 
     public CharacteristicWriteMsg(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
@@ -588,8 +596,10 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class DescriptorWriteMsg {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
     public final BluetoothGattDescriptor descriptor;
+    // CHECKSTYLE.ON
     public final int status;
 
     public DescriptorWriteMsg(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
@@ -600,8 +610,10 @@ import rx.subscriptions.Subscriptions;
   }
 
   private static final class GattService {
+    // CHECKSTYLE.OFF: VisibilityModifier
     public final BluetoothGatt gatt;
     public final BluetoothGattService service;
+    // CHECKSTYLE.ON
 
     public GattService(BluetoothGatt gatt, BluetoothGattService service) {
       this.gatt = gatt;

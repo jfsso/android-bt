@@ -379,37 +379,33 @@ import rx.subscriptions.Subscriptions;
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return characteristicReadObservable
       .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
-        @Override
-        public Boolean call(BluetoothGattCharacteristic chara) {
+        @Override public Boolean call(BluetoothGattCharacteristic chara) {
           Log.i("makeReadObservable", "comparing " + param.uuid + " to " + chara.getUuid());
           return param.uuid.equals(chara.getUuid());
         }
       })
       .first()
       .doOnSubscribe(new Action0() {
-        @Override
-        public void call() {
+        @Override public void call() {
           if (!gatt.readCharacteristic(characteristic)) {
             throw new RuntimeException("failed to initiate read of characteristic " + param.uuid);
           }
         }
       })
-      .replay(1);
+      .publish();
   }
 
   private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return descriptorWriteObservable
       .filter(new Func1<DescriptorWriteMsg, Boolean>() {
-        @Override
-        public Boolean call(DescriptorWriteMsg msg) {
+        @Override public Boolean call(DescriptorWriteMsg msg) {
           return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
         }
       })
       .first()
       .lift(new Observable.Operator<DescriptorWriteMsg, DescriptorWriteMsg>() {
-        @Override
-        public Subscriber<? super DescriptorWriteMsg> call(Subscriber<? super DescriptorWriteMsg> subscriber) {
+        @Override public Subscriber<? super DescriptorWriteMsg> call(Subscriber<? super DescriptorWriteMsg> subscriber) {
           if (!gatt.setCharacteristicNotification(characteristic, true)) {
             throw new RuntimeException("failed to initiate streaming for characteristic " + param.uuid);
           }
@@ -445,7 +441,7 @@ import rx.subscriptions.Subscriptions;
           return subscriber;
         }
       })
-      .replay(1);
+      .publish();
   }
 
   private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> param,
@@ -465,7 +461,7 @@ import rx.subscriptions.Subscriptions;
           }
         }
       })
-      .replay(1);
+      .publish();
   }
 
   private static final class ConnectionStateChangeMsg {

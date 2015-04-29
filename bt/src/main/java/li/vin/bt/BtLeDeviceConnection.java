@@ -177,7 +177,6 @@ import rx.subscriptions.Subscriptions;
                 ? makeNotiObservable(param, gs.gatt, characteristic)
                 : null;
 
-
               if (readObservable == null && notiObservable == null) {
                 return Observable.empty();
               }
@@ -203,43 +202,38 @@ import rx.subscriptions.Subscriptions;
           })
           .filter(matchesUuid)
           .map(parseCharacteristic)
+          .doOnUnsubscribe(new Action0() {
+            @Override
+            public void call() {
+              Log.d("uuid.doOnUnsubscribe", "unsubscribing " + param.uuid);
+              mUuidObservables.remove(param.uuid);
+            }
+          })
           .share();
-
-        uuidObservable.doOnUnsubscribe(new Action0() {
-          @Override public void call() {
-            Log.d("uuid.doOnUnsubscribe", "unsubscribing " + param.uuid);
-            mUuidObservables.remove(param.uuid);
-          }
-        });
 
         mUuidObservables.put(param.uuid, uuidObservable);
       }
 
-      final Func1<P, Boolean> matchesParsed = new Func1<P, Boolean>() {
-        @Override public Boolean call(P s) {
-          return param.matches(s);
-        }
-      };
-
-      final Func1<P, T> parseVal = new Func1<P, T>() {
-        @Override public T call(P s) {
-          return param.parseVal(s);
-        }
-      };
-
       paramObservable = uuidObservable
-        .filter(matchesParsed)
-        .map(parseVal)
+        .filter(new Func1<P, Boolean>() {
+          @Override public Boolean call(P s) {
+            return param.matches(s);
+          }
+        })
+        .map(new Func1<P, T>() {
+          @Override public T call(P s) {
+            return param.parseVal(s);
+          }
+        })
         .distinctUntilChanged()
+        .doOnUnsubscribe(new Action0() {
+          @Override
+          public void call() {
+            Log.d("param.doOnUnsubscribe", "unsubscribing " + param.uuid);
+            mParamObservables.remove(param);
+          }
+        })
         .share();
-
-      paramObservable.doOnUnsubscribe(new Action0() {
-        @Override
-        public void call() {
-          Log.d("param.doOnUnsubscribe", "unsubscribing " + param.uuid);
-          mParamObservables.remove(param);
-        }
-      });
 
       mParamObservables.put(param, paramObservable);
     }
@@ -348,7 +342,8 @@ import rx.subscriptions.Subscriptions;
       return subscriber;
     }
   })
-  .share();
+  .replay(1)
+  .refCount();
 
   private static final class WriteQueueConsumer extends Subscriber<ConnectableObservable<?>> {
     @Override public void onCompleted() { }
@@ -381,39 +376,43 @@ import rx.subscriptions.Subscriptions;
 
   private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
-    return Observable.create(new Observable.OnSubscribe<Void>() {
-      @Override public void call(Subscriber<? super Void> subscriber) {
-        if (gatt.readCharacteristic(characteristic)) {
-          subscriber.onNext(null);
-          subscriber.onCompleted();
-        } else {
-          subscriber.onError(new RuntimeException("failed to initiate read of characteristic " + param.uuid));
+    return characteristicReadObservable
+      .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
+        @Override
+        public Boolean call(BluetoothGattCharacteristic chara) {
+          Log.i("makeReadObservable", "comparing " + param.uuid + " to " + chara.getUuid());
+          return param.uuid.equals(chara.getUuid());
         }
-      }
-    }).flatMap(new Func1<Void, Observable<BluetoothGattCharacteristic>>() {
-      @Override public Observable<BluetoothGattCharacteristic> call(Void aVoid) {
-        return characteristicReadObservable
-          .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
-            @Override public Boolean call(BluetoothGattCharacteristic chara) {
-              Log.i("makeReadObservable", "comparing " + param.uuid + " to " + chara.getUuid());
-              return param.uuid.equals(chara.getUuid());
-            }
-          })
-          .first()
-          /*.doOnNext(new Action1<BluetoothGattCharacteristic>() {
-            @Override public void call(BluetoothGattCharacteristic characteristic) {
-              Log.i("makeReadObservable", "finished read of " + param.uuid);
-            }
-          })*/;
-      }
-    }).publish();
+      })
+      .first()
+      .doOnSubscribe(new Action0() {
+        @Override
+        public void call() {
+          if (!gatt.readCharacteristic(characteristic)) {
+            throw new RuntimeException("failed to initiate read of characteristic " + param.uuid);
+          }
+        }
+      })
+      .publish();
   }
 
   private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
-    return Observable.create(new Observable.OnSubscribe<Void>() {
-      @Override public void call(Subscriber<? super Void> subscriber) {
-        if (gatt.setCharacteristicNotification(characteristic, true)) {
+    return descriptorWriteObservable
+      .filter(new Func1<DescriptorWriteMsg, Boolean>() {
+        @Override
+        public Boolean call(DescriptorWriteMsg msg) {
+          return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
+        }
+      })
+      .first()
+      .lift(new Observable.Operator<DescriptorWriteMsg, DescriptorWriteMsg>() {
+        @Override
+        public Subscriber<? super DescriptorWriteMsg> call(Subscriber<? super DescriptorWriteMsg> subscriber) {
+          if (!gatt.setCharacteristicNotification(characteristic, true)) {
+            throw new RuntimeException("failed to initiate streaming for characteristic " + param.uuid);
+          }
+
           final BluetoothGattDescriptor descriptor =
             characteristic.getDescriptor(Uuids.CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID);
 
@@ -427,75 +426,45 @@ import rx.subscriptions.Subscriptions;
 
           descriptor.setValue(enableNotificationsValue);
 
-          if (gatt.writeDescriptor(descriptor)) {
-            subscriber.add(Subscriptions.create(new Action0() {
-              @Override public void call() {
-                Log.d("GattNotificationsOff", characteristic.getUuid().toString());
-                gatt.setCharacteristicNotification(characteristic, false);
-
-                final ConnectableObservable<? extends Object> stopNotiObservable =
-                  makeStopNotiObservable(param, gatt, descriptor);
-
-                Log.d("ChangeSubscriber", "queuing notification stop for " + param.uuid);
-                writeQueue.onNext(stopNotiObservable);
-              }
-            }));
-
-            subscriber.onNext(null);
-            subscriber.onCompleted();
-
-            return;
+          if (!gatt.writeDescriptor(descriptor)) {
+            throw new RuntimeException("failed to initiate streaming for characteristic " + param.uuid);
           }
-        }
 
-        subscriber.onError(new RuntimeException("failed to initiate streaming for characteristic " + param.uuid));
-      }
-    }).flatMap(new Func1<Void, Observable<DescriptorWriteMsg>>() {
-      @Override public Observable<DescriptorWriteMsg> call(Void aVoid) {
-        return descriptorWriteObservable
-          .filter(new Func1<DescriptorWriteMsg, Boolean>() {
-            @Override public Boolean call(DescriptorWriteMsg msg) {
-              return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
+          subscriber.add(Subscriptions.create(new Action0() {
+            @Override
+            public void call() {
+              Log.d("GattNotificationsOff", characteristic.getUuid().toString());
+              gatt.setCharacteristicNotification(characteristic, false);
+
+              Log.d("ChangeSubscriber", "queuing notification stop for " + param.uuid);
+              writeQueue.onNext(makeStopNotiObservable(param, gatt, descriptor));
             }
-          })
-          .first()
-          /*.doOnNext(new Action1<DescriptorWriteMsg>() {
-            @Override public void call(DescriptorWriteMsg msg) {
-              Log.i("SubscribeToChanges", "enabled notifications for " + param.uuid);
-            }
-          })*/;
-      }
-    }).publish();
+          }));
+
+          return subscriber;
+        }
+      })
+      .publish();
   }
 
   private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> param,
       final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
-    return Observable.create(new Observable.OnSubscribe<Void>() {
-      @Override public void call(Subscriber<? super Void> subscriber) {
-        descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-        if (gatt.writeDescriptor(descriptor)) {
-          subscriber.onNext(null);
-          subscriber.onCompleted();
-        } else {
-          subscriber.onError(new RuntimeException("failed to initiate stopping of notifications for " + param.uuid));
+    return descriptorWriteObservable
+      .filter(new Func1<DescriptorWriteMsg, Boolean>() {
+        @Override public Boolean call(DescriptorWriteMsg msg) {
+          return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
         }
-      }
-    }).flatMap(new Func1<Void, Observable<?>>() {
-      @Override public Observable<?> call(Void aVoid) {
-        return descriptorWriteObservable
-          .filter(new Func1<DescriptorWriteMsg, Boolean>() {
-            @Override public Boolean call(DescriptorWriteMsg msg) {
-              return param.uuid.equals(msg.descriptor.getCharacteristic().getUuid());
-            }
-          })
-          .first()
-          /*.doOnNext(new Action1<DescriptorWriteMsg>() {
-            @Override public void call(DescriptorWriteMsg msg) {
-              Log.i("SubscribeToChanges", "finished turning off notifications for " + param.uuid);
-            }
-          })*/;
-      }
-    }).publish();
+      })
+      .first()
+      .doOnSubscribe(new Action0() {
+        @Override public void call() {
+          descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+          if (!gatt.writeDescriptor(descriptor)) {
+            throw new RuntimeException("failed to initiate stopping of notifications for " + param.uuid);
+          }
+        }
+      })
+      .publish();
   }
 
   private static final class ConnectionStateChangeMsg {

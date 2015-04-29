@@ -127,7 +127,7 @@ import rx.subscriptions.Subscriptions;
           return null;
         }
       })
-      .publish();
+      .replay(1);
 
     writeQueue.onNext(clearDtcsObservable);
 
@@ -360,6 +360,7 @@ import rx.subscriptions.Subscriptions;
         @Override public void onNext(Object whatevs) { }
 
         @Override public void onError(Throwable e) {
+          Log.e(TAG, "WriteQueue item failed", e);
           Log.d("requestNext", "requesting next writeQueue item");
           WriteQueueConsumer.this.request(1);
         }
@@ -393,7 +394,7 @@ import rx.subscriptions.Subscriptions;
           }
         }
       })
-      .publish();
+      .replay(1);
   }
 
   private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> param,
@@ -444,7 +445,7 @@ import rx.subscriptions.Subscriptions;
           return subscriber;
         }
       })
-      .publish();
+      .replay(1);
   }
 
   private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> param,
@@ -464,7 +465,7 @@ import rx.subscriptions.Subscriptions;
           }
         }
       })
-      .publish();
+      .replay(1);
   }
 
   private static final class ConnectionStateChangeMsg {

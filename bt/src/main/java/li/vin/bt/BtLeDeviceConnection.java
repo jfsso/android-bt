@@ -319,8 +319,7 @@ import rx.subscriptions.Subscriptions;
     }
   })
   .takeUntil(connectionStateObservable.filter(new Func1<ConnectionStateChangeMsg, Boolean>() {
-    @Override
-    public Boolean call(ConnectionStateChangeMsg msg) {
+    @Override public Boolean call(ConnectionStateChangeMsg msg) {
       return BluetoothProfile.STATE_DISCONNECTED == msg.newState;
     }
   }))
@@ -338,8 +337,27 @@ import rx.subscriptions.Subscriptions;
         public void call() {
           Log.d("GattConnection", "disconnecting from gatt after all unsubscribed");
           writeQueueSubscription.unsubscribe();
-//          gatt.disconnect();
-          gatt.close();
+
+          connectionStateObservable
+            .filter(new Func1<ConnectionStateChangeMsg, Boolean>() {
+              @Override public Boolean call(ConnectionStateChangeMsg msg) {
+                return BluetoothProfile.STATE_DISCONNECTED == msg.newState;
+              }
+            })
+            .first()
+            .subscribe(new Subscriber<ConnectionStateChangeMsg>() {
+              @Override public void onCompleted() { }
+
+              @Override public void onError(Throwable e) {
+                Log.e(TAG, "failed to disconnect from gatt", e);
+              }
+
+              @Override public void onNext(ConnectionStateChangeMsg msg) {
+                gatt.close();
+              }
+            });
+
+          gatt.disconnect();
         }
       }));
 

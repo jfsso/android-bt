@@ -31,9 +31,7 @@ import java.util.UUID;
 
   /**
    * Stream of all car data except:
-   *  speed(0D),
    *  rpm(0C),
-   *  load(04),
    *  VIN,
    *  DTCs
    * format: 41XX{data} where XX === PID

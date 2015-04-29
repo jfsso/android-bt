@@ -105,6 +105,8 @@ import rx.subscriptions.Subscriptions;
             throw new RuntimeException("bluetooth service is missing the CLEAR_DTCS characteristic");
           }
 
+          characteristic.setValue(new byte[] {0x00});
+
           if (!gs.gatt.writeCharacteristic(characteristic)) {
             throw new RuntimeException("failed to initiate write to clear DTCs");
           }
@@ -121,8 +123,10 @@ import rx.subscriptions.Subscriptions;
       })
       .first()
       .map(new Func1<CharacteristicWriteMsg, Void>() {
-        @Override
-        public Void call(CharacteristicWriteMsg characteristicWriteMsg) {
+        @Override public Void call(CharacteristicWriteMsg msg) {
+          if (BluetoothGatt.GATT_SUCCESS != msg.status) {
+            throw new RuntimeException("failed to clear the DTCs");
+          }
           Log.d(TAG, "resetDtcs: dtcs reset");
           return null;
         }
@@ -428,8 +432,7 @@ import rx.subscriptions.Subscriptions;
           }
 
           subscriber.add(Subscriptions.create(new Action0() {
-            @Override
-            public void call() {
+            @Override public void call() {
               Log.d("GattNotificationsOff", characteristic.getUuid().toString());
               gatt.setCharacteristicNotification(characteristic, false);
 

@@ -56,7 +56,7 @@ public final class Params {
     }
   };
 
-  public static final Param<List<String>> DTC_CODES = new ParamPlain<List<String>>(Uuids.DTCS) {
+  public static final Param<List<String>> DTC_CODES = new ParamPlain<List<String>>(Uuids.DTCS, false, true) {
     @Override public List<String> parseVal(final String val) {
       if (val == null) {
         return Collections.emptyList();

@@ -94,39 +94,37 @@ import rx.subscriptions.Subscriptions;
   }
 
   @Override public Observable<Void> resetDtcs() {
+    Log.d(TAG, "resetDtcs");
     final ConnectableObservable<Void> clearDtcsObservable = connectionObservable
-      .flatMap(new Func1<GattService, Observable<Void>>() {
-        @Override public Observable<Void> call(final GattService gs) {
-          return Observable.create(new Observable.OnSubscribe<Void>() {
-            @Override public void call(Subscriber<? super Void> subscriber) {
+      .flatMap(new Func1<GattService, Observable<CharacteristicWriteMsg>>() {
+        @Override
+        public Observable<CharacteristicWriteMsg> call(final GattService gs) {
+          Log.d(TAG, "resetDtcs: connected");
           final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(Uuids.CLEAR_DTCS);
           if (characteristic == null) {
             throw new RuntimeException("bluetooth service is missing the CLEAR_DTCS characteristic");
           }
 
-              if (gs.gatt.writeCharacteristic(characteristic)) {
-                subscriber.onNext(null);
-                subscriber.onCompleted();
-              } else {
-                subscriber.onError(new RuntimeException("failed to initiate write to clear DTCs"));
+          if (!gs.gatt.writeCharacteristic(characteristic)) {
+            throw new RuntimeException("failed to initiate write to clear DTCs");
           }
+
+          Log.d(TAG, "resetDtcs: waiting for write confirmation");
+          return characteristicWriteObservable;
         }
-          }).flatMap(new Func1<Void, Observable<Void>>() {
-            @Override public Observable<Void> call(Void aVoid) {
-              return characteristicWriteObservable
+      })
       .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
-                  @Override public Boolean call(CharacteristicWriteMsg msg) {
+        @Override
+        public Boolean call(CharacteristicWriteMsg msg) {
           return Uuids.CLEAR_DTCS.equals(msg.characteristic.getUuid());
         }
       })
       .first()
       .map(new Func1<CharacteristicWriteMsg, Void>() {
-                  @Override public Void call(CharacteristicWriteMsg characteristicWriteMsg) {
+        @Override
+        public Void call(CharacteristicWriteMsg characteristicWriteMsg) {
+          Log.d(TAG, "resetDtcs: dtcs reset");
           return null;
-        }
-                });
-            }
-          });
         }
       })
       .publish();

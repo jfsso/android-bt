@@ -58,7 +58,7 @@ import java.util.UUID;
   }
 
   @Override public Boolean matches(final String val) {
-    Log.i("StreamPid", "matching " + mCode + " against " + val);
+//    Log.i("StreamPid", "matching " + mCode + " against " + val);
     return val.startsWith(mCode) ? Boolean.TRUE : Boolean.FALSE;
   }
 }

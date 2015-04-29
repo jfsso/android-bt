@@ -99,31 +99,31 @@ import rx.subscriptions.Subscriptions;
         @Override public Observable<Void> call(final GattService gs) {
           return Observable.create(new Observable.OnSubscribe<Void>() {
             @Override public void call(Subscriber<? super Void> subscriber) {
-              final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(Uuids.CLEAR_DTCS);
-              if (characteristic == null) {
-                throw new RuntimeException("bluetooth service is missing the CLEAR_DTCS characteristic");
-              }
+          final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(Uuids.CLEAR_DTCS);
+          if (characteristic == null) {
+            throw new RuntimeException("bluetooth service is missing the CLEAR_DTCS characteristic");
+          }
 
               if (gs.gatt.writeCharacteristic(characteristic)) {
                 subscriber.onNext(null);
                 subscriber.onCompleted();
               } else {
                 subscriber.onError(new RuntimeException("failed to initiate write to clear DTCs"));
-              }
-            }
+          }
+        }
           }).flatMap(new Func1<Void, Observable<Void>>() {
             @Override public Observable<Void> call(Void aVoid) {
               return characteristicWriteObservable
-                .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
+      .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
                   @Override public Boolean call(CharacteristicWriteMsg msg) {
-                    return Uuids.CLEAR_DTCS.equals(msg.characteristic.getUuid());
-                  }
-                })
-                .first()
-                .map(new Func1<CharacteristicWriteMsg, Void>() {
+          return Uuids.CLEAR_DTCS.equals(msg.characteristic.getUuid());
+        }
+      })
+      .first()
+      .map(new Func1<CharacteristicWriteMsg, Void>() {
                   @Override public Void call(CharacteristicWriteMsg characteristicWriteMsg) {
-                    return null;
-                  }
+          return null;
+        }
                 });
             }
           });
@@ -261,8 +261,77 @@ import rx.subscriptions.Subscriptions;
     }
   };
 
-  private final Observable.OnSubscribe<Void> startGattOnSubscribe = new Observable.OnSubscribe<Void>()  {
-    @Override public void call(Subscriber<? super Void> subscriber) {
+  private final Observable<GattService> connectionObservable = connectionStateObservable
+  .filter(new Func1<ConnectionStateChangeMsg, Boolean>() {
+    @Override
+    public Boolean call(ConnectionStateChangeMsg msg) {
+      return BluetoothProfile.STATE_CONNECTED == msg.newState;
+    }
+  })
+  .first()
+  .flatMap(new Func1<ConnectionStateChangeMsg, Observable<ServiceMsg>>() {
+    @Override public Observable<ServiceMsg> call(ConnectionStateChangeMsg msg) {
+      Log.d(TAG, "connected to device. Discovering services...");
+      msg.gatt.discoverServices();
+      return serviceObservable;
+    }
+  })
+  .flatMap(new Func1<ServiceMsg, Observable<GattService>>() {
+    @Override
+    public Observable<GattService> call(ServiceMsg msg) {
+      if (BluetoothGatt.GATT_SUCCESS != msg.status) {
+        throw new RuntimeException("failed to find services"); // TODO: better error
+      }
+
+      final BluetoothGattService service = msg.gatt.getService(Uuids.SERVICE);
+      if (service == null) {
+        throw new RuntimeException("service not found: " + Uuids.SERVICE); // TODO: better error
+      }
+
+      Log.d(TAG, "found Vinli service. Unlocking device...");
+
+      final BluetoothGattCharacteristic characteristic = service.getCharacteristic(Uuids.UNLOCK);
+      if (characteristic == null) {
+        throw new RuntimeException("no such characteristic: " + Uuids.UNLOCK);
+      }
+
+      characteristic.setValue(mUnlockKey.getBytes(Charset.forName("ASCII")));
+      if (!msg.gatt.writeCharacteristic(characteristic)) {
+        throw new RuntimeException("failed to start write to unlock device");
+      }
+
+      return characteristicWriteObservable
+        .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
+          @Override
+          public Boolean call(CharacteristicWriteMsg msg) {
+            return Uuids.UNLOCK.equals(msg.characteristic.getUuid());
+          }
+        })
+        .first()
+        .map(new Func1<CharacteristicWriteMsg, GattService>() {
+          @Override
+          public GattService call(CharacteristicWriteMsg msg) {
+            if (BluetoothGatt.GATT_SUCCESS != msg.status) {
+              throw new RuntimeException("failed to unlock service: " + Utils.gattStatus(msg.status));
+            }
+
+            Log.d(TAG, "device unlocked");
+
+            return new GattService(msg.gatt, service);
+          }
+        });
+    }
+  })
+  .takeUntil(connectionStateObservable.filter(new Func1<ConnectionStateChangeMsg, Boolean>() {
+    @Override
+    public Boolean call(ConnectionStateChangeMsg msg) {
+      return BluetoothProfile.STATE_DISCONNECTED == msg.newState;
+    }
+  }))
+  .lift(new Observable.Operator<GattService, GattService>() {
+    @Override
+    public Subscriber<? super GattService> call(Subscriber<? super GattService> subscriber) {
+      Log.d(TAG, "starting device connection");
       final BluetoothGatt gatt = mDevice.connectGatt(mContext, false, BtLeDeviceConnection.this);
       final Subscription writeQueueSubscription = writeQueue
         .onBackpressureBuffer()
@@ -278,120 +347,10 @@ import rx.subscriptions.Subscriptions;
         }
       }));
 
-      subscriber.onNext(null);
-      subscriber.onCompleted();
+      return subscriber;
     }
-  };
-
-  private static final Observable.Operator<Void, ConnectionStateChangeMsg> waitForConnectionOperator = new Observable.Operator<Void, ConnectionStateChangeMsg>() {
-    @Override public Subscriber<? super ConnectionStateChangeMsg> call(final Subscriber<? super Void> subscriber) {
-      return new Subscriber<ConnectionStateChangeMsg>() {
-        @Override public void onCompleted() {
-          subscriber.onCompleted();
-        }
-
-        @Override public void onError(Throwable e) {
-          subscriber.onError(e);
-        }
-
-        @Override public void onNext(ConnectionStateChangeMsg msg) {
-//          Log.d("waitForConnectionOperator", "got connection state change msg");
-          if (BluetoothProfile.STATE_CONNECTED == msg.newState) {
-            msg.gatt.discoverServices();
-            subscriber.onNext(null);
-          } else if (BluetoothProfile.STATE_DISCONNECTED == msg.newState) {
-            subscriber.onCompleted();
-          }
-        }
-      };
-    }
-  };
-
-  private final Func1<Void, Observable<Void>> waitForConnection = new Func1<Void, Observable<Void>>() {
-    @Override public Observable<Void> call(Void aVoid) {
-      // leave a subscriber on the gatt observable. not leaving this can lead to a
-      // race condition in which the gatt observable thinks all subscribers
-      // have unsubscribed because a ConnectableObservable from the write queue
-      // has not yet been connected.
-      return connectionStateObservable
-        .lift(waitForConnectionOperator)
-        /*.first()*/;
-    }
-  };
-
-  private static final Observable.Operator<GattService, ServiceMsg> waitForServiceOperator = new Observable.Operator<GattService, ServiceMsg>() {
-    @Override public Subscriber<? super ServiceMsg> call(final Subscriber<? super GattService> subscriber) {
-      return new Subscriber<ServiceMsg>() {
-        @Override public void onCompleted() {
-          subscriber.onCompleted();
-        }
-
-        @Override public void onError(Throwable e) {
-          subscriber.onError(e);
-        }
-
-        @Override public void onNext(ServiceMsg msg) {
-          Log.d("waitForServiceOperator", "got service msg");
-          if (BluetoothGatt.GATT_SUCCESS == msg.status) {
-            final BluetoothGattService service = msg.gatt.getService(Uuids.SERVICE);
-            if (service == null) {
-              // TODO: better error
-              subscriber.onError(new RuntimeException("service not found: " + Uuids.SERVICE));
-            } else {
-              subscriber.onNext(new GattService(msg.gatt, service));
-//              subscriber.onCompleted(); // Do we need to complete here?
-            }
-          } else {
-            subscriber.onError(new RuntimeException("failed to find services")); // TODO: better error
-          }
-        }
-      };
-    }
-  };
-
-  private final Func1<Void, Observable<GattService>> waitForService = new Func1<Void, Observable<GattService>>() {
-    @Override public Observable<GattService> call(Void aVoid) {
-      return serviceObservable
-        .lift(waitForServiceOperator)
-        .first();
-    }
-  };
-
-  private final Func1<GattService, Observable<GattService>> unlockDevice = new Func1<GattService, Observable<GattService>>() {
-    private final Charset ascii = Charset.forName("ASCII");
-
-    @Override public Observable<GattService> call(final GattService gs) {
-      final BluetoothGattCharacteristic characteristic = gs.service.getCharacteristic(Uuids.UNLOCK);
-      if (characteristic == null) {
-        throw new RuntimeException("no such characteristic: " + Uuids.UNLOCK);
-      }
-
-      characteristic.setValue(mUnlockKey.getBytes(ascii));
-      if (!gs.gatt.writeCharacteristic(characteristic)) {
-        throw new RuntimeException("failed to start write to unlock device");
-      }
-
-      return characteristicWriteObservable
-        .first()
-        .map(new Func1<CharacteristicWriteMsg, GattService>() {
-          @Override public GattService call(CharacteristicWriteMsg msg) {
-            Log.d("unlockService", "got write confirmation");
-            if (BluetoothGatt.GATT_SUCCESS == msg.status) {
-              return gs;
-            } else {
-              throw new RuntimeException("failed to unlock service: " + Utils.gattStatus(msg.status));
-            }
-          }
-        });
-    }
-  };
-
-  private final Observable<GattService> connectionObservable = Observable
-    .create(startGattOnSubscribe)
-    .flatMap(waitForConnection)
-    .flatMap(waitForService)
-    .flatMap(unlockDevice)
-    .share();
+  })
+  .share();
 
   private static final class WriteQueueConsumer extends Subscriber<ConnectableObservable<?>> {
     @Override public void onCompleted() { }

@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.util.Log;
 
 import java.nio.ByteBuffer;
@@ -21,15 +22,12 @@ public final class VinliDevices {
   private static final String TAG = VinliDevices.class.getSimpleName();
   private static final long DEFAULT_SCAN_PERIOD = 10000;
 
-  public static Observable<Device> createDeviceObservable(final Context context) {
+  public static Observable<Device> createDeviceObservable(@NonNull final Context context) {
     return createDeviceObservable(context, DEFAULT_SCAN_PERIOD);
   }
 
-  public static Observable<Device> createDeviceObservable(final Context context,
+  public static Observable<Device> createDeviceObservable(@NonNull final Context context,
       final long scanTimeout) {
-    if (context == null) {
-      throw new IllegalArgumentException("context is null");
-    }
     if (scanTimeout <= 0) {
       throw new IllegalArgumentException("scan timeout must be greater than zero");
     }

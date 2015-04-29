@@ -30,6 +30,7 @@ android {
 
 dependencies {
     compile 'io.reactivex:rxjava:1.0.+'
+    compile 'com.android.support:support-annotations:22.1.+'
 }
 
 apply from: rootProject.file('gradle/checkstyle.gradle')

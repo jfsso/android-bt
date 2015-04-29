@@ -4,11 +4,12 @@ import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.support.annotation.NonNull;
 
 /*package*/ final class BtLeDevice implements Device {
   private final BluetoothDevice mDevice;
 
-  /*package*/ BtLeDevice(BluetoothDevice device) {
+  /*package*/ BtLeDevice(@NonNull BluetoothDevice device) {
     mDevice = device;
   }
 
@@ -24,7 +25,7 @@ import android.os.Parcelable;
     return name;
   }
 
-  public DeviceConnection createDeviceConnection(Context context, String unlockKey) {
+  public DeviceConnection createDeviceConnection(@NonNull Context context, @NonNull String unlockKey) {
     return new BtLeDeviceConnection(context, mDevice, unlockKey);
   }
 

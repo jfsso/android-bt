@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
+import android.support.annotation.NonNull;
 import android.util.Log;
 
 import java.nio.charset.Charset;
@@ -44,7 +45,7 @@ import rx.subscriptions.Subscriptions;
   private final BluetoothDevice mDevice;
   private final String mUnlockKey;
 
-  public BtLeDeviceConnection(Context context, BluetoothDevice device, String unlockKey) {
+  public BtLeDeviceConnection(@NonNull Context context, @NonNull BluetoothDevice device, @NonNull String unlockKey) {
     mContext = context;
     mDevice = device;
     mUnlockKey = unlockKey;
@@ -135,10 +136,7 @@ import rx.subscriptions.Subscriptions;
     return clearDtcsObservable.asObservable();
   }
 
-  @Override public <T> Observable<T> observe(final Param<T> param) {
-    if (param == null) {
-      throw new IllegalArgumentException("param == null");
-    }
+  @Override public <T> Observable<T> observe(@NonNull final Param<T> param) {
     if (!(param instanceof ParamImpl)) {
       throw new AssertionError("all Params must be instances of ParamImpl");
     }
@@ -146,7 +144,7 @@ import rx.subscriptions.Subscriptions;
     return observe((ParamImpl<T, ?>) param);
   }
 
-  private <T, P> Observable<T> observe(final ParamImpl<T, P> param) {
+  private <T, P> Observable<T> observe(@NonNull final ParamImpl<T, P> param) {
     @SuppressWarnings("unchecked")
     Observable<T> paramObservable = (Observable<T>) mParamObservables.get(param);
     if (paramObservable == null) {

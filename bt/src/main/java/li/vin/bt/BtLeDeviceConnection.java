@@ -334,7 +334,7 @@ import rx.subscriptions.Subscriptions;
         public void call() {
           Log.d("GattConnection", "disconnecting from gatt after all unsubscribed");
           writeQueueSubscription.unsubscribe();
-          gatt.disconnect();
+//          gatt.disconnect();
           gatt.close();
         }
       }));

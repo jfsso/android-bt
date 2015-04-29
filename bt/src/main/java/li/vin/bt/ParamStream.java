@@ -29,7 +29,7 @@ import java.util.UUID;
       throw new RuntimeException("val == null");
     }
 
-//      Log.d("parseCharacteristic", new String(val, 0, val.length, ASCII));
+    Log.d("parseCharacteristic", new String(val, 0, val.length, ASCII));
 
     int valStart = 2;
     if (val[0] != '4' || val[1] != '1') {

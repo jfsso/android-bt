@@ -6,4 +6,16 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
 
+    <application>
+        <service
+            android:name="li.vin.bt.DeviceService"
+            android:exported="true"
+            android:label="Vinli Device Service"
+            android:process="li.vin.bt.deviceService">
+
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

@@ -1,49 +1,16 @@
 package li.vin.bt;
 
-import android.bluetooth.BluetoothDevice;
 import android.content.Context;
-import android.os.Parcel;
-import android.os.Parcelable;
 import android.support.annotation.NonNull;
 
 /*package*/ final class BtLeDevice implements Device {
-  private final BluetoothDevice mDevice;
-
-  /*package*/ BtLeDevice(@NonNull BluetoothDevice device) {
-    mDevice = device;
-  }
-
-  private BtLeDevice(Parcel in) {
-    mDevice = in.readParcelable(null);
-  }
 
   public String getName() {
-    String name = mDevice.getName();
-    if (name == null) {
-      name = mDevice.getAddress();
-    }
-    return name;
+    return "kyle";
   }
 
   public DeviceConnection createDeviceConnection(@NonNull Context context, @NonNull String unlockKey) {
-    return new BtLeDeviceConnection(context, mDevice, unlockKey);
+    return new BtLeDeviceConnection(context, unlockKey);
   }
 
-  @Override public void writeToParcel(Parcel out, int flags) {
-    out.writeParcelable(mDevice, flags);
-  }
-
-  @Override public int describeContents() {
-    return 0;
-  }
-
-  public static final Parcelable.Creator<BtLeDevice> CREATOR = new Parcelable.Creator<BtLeDevice>() {
-    public BtLeDevice createFromParcel(Parcel in) {
-      return new BtLeDevice(in);
-    }
-
-    public BtLeDevice[] newArray(int size) {
-      return new BtLeDevice[size];
-    }
-  };
 }

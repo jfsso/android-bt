@@ -2,7 +2,7 @@ package li.vin.bt;
 
 import android.util.Log;
 
-/*package*/ class ParamO2sVoltage extends ParamStream<Float> {
+/*package*/ class ParamO2sVoltage extends ParamStreamFloat {
   private static final float RATIO = 8 / 65535f;
 
   public ParamO2sVoltage(String code) {

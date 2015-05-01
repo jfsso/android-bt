@@ -1,22 +1,17 @@
 package li.vin.bt;
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
 import android.content.Context;
-import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import rx.Observable;
 import rx.Subscriber;
-import rx.functions.Action0;
-import rx.subscriptions.Subscriptions;
 
 public final class VinliDevices {
   private static final String TAG = VinliDevices.class.getSimpleName();
@@ -36,62 +31,8 @@ public final class VinliDevices {
 
     return Observable.create(new Observable.OnSubscribe<Device>() {
       @Override public void call(final Subscriber<? super Device> subscriber) {
-        final BluetoothManager manager =
-          (BluetoothManager) appContext.getSystemService(Context.BLUETOOTH_SERVICE);
-
-        if (manager == null) {
-          subscriber.onError(new BluetoothException("failed to get the Android bluetooth service"));
-          return;
-        }
-
-        final BluetoothAdapter adapter = manager.getAdapter();
-
-        if (adapter == null || !adapter.isEnabled()) {
-          subscriber.onError(new BluetoothDisabledException("bluetooth is disabled"));
-          return;
-        }
-
-        final BluetoothAdapter.LeScanCallback listener = new BluetoothAdapter.LeScanCallback() {
-          @Override public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-            Log.d(TAG, "Found device " + device + " UUIDs: " + Arrays.toString(device.getUuids()));
-
-            if (isVinliDevice(scanRecord)) {
-              final Device d = new BtLeDevice(device);
-              subscriber.onNext(d);
-            }
-          }
-        };
-
-        final Action0 stopScan = new Action0() {
-          private boolean called = false;
-
-          @Override public void call() {
-            if (!called) {
-              adapter.stopLeScan(listener);
-              called = true;
-            }
-          }
-        };
-
-        final Runnable timeoutListener = new Runnable() {
-          @Override public void run() {
-            Log.d(TAG, "device scanned timed out");
-            stopScan.call();
-            subscriber.onCompleted();
-          }
-        };
-
-        final Handler handler = new Handler();
-        handler.postDelayed(timeoutListener, scanTimeout);
-        adapter.startLeScan(listener);
-
-        subscriber.add(Subscriptions.create(new Action0() {
-          @Override public void call() {
-            Log.d(TAG, "all unsubscribed from device scan");
-            stopScan.call();
-            handler.removeCallbacks(timeoutListener);
-          }
-        }));
+        subscriber.onNext(new BtLeDevice());
+        subscriber.onCompleted();
       }
     });
   }
@@ -99,10 +40,6 @@ public final class VinliDevices {
   private VinliDevices() {
   }
 
-  /**
-   * Work-around for device filtering not working for 128-bit UUIDs
-   * <a href="http://stackoverflow.com/questions/18019161/startlescan-with-128-bit-uuids-doesnt-work-on-native-android-ble-implementation/21986475#21986475">Implementation found here</a>
-   */
   private static boolean isVinliDevice(final byte[] advertisedData) {
     int offset = 0;
     while (offset < (advertisedData.length - 2)) {
@@ -150,5 +87,47 @@ public final class VinliDevices {
     }
 
     return false;
+  }
+
+  /**
+   * Work-around for device filtering not working for 128-bit UUIDs
+   * <a href="http://stackoverflow.com/a/19060589">Implementation found here</a>
+   */
+  private static final List<UUID> parseUuids(byte[] advertisedData) {
+    final List<UUID> uuids = new ArrayList<>();
+
+    final ByteBuffer buffer = ByteBuffer.wrap(advertisedData).order(ByteOrder.LITTLE_ENDIAN);
+    while (buffer.remaining() > 2) {
+      byte length = buffer.get();
+      if (length == 0) break;
+
+      byte type = buffer.get();
+      switch (type) {
+        case 0x02: // Partial list of 16-bit UUIDs
+        case 0x03: // Complete list of 16-bit UUIDs
+          while (length >= 2) {
+            uuids.add(UUID.fromString(String.format(
+              "%08x-0000-1000-8000-00805f9b34fb", buffer.getShort())));
+            length -= 2;
+          }
+          break;
+
+        case 0x06: // Partial list of 128-bit UUIDs
+        case 0x07: // Complete list of 128-bit UUIDs
+          while (length >= 16) {
+            long lsb = buffer.getLong();
+            long msb = buffer.getLong();
+            uuids.add(new UUID(msb, lsb));
+            length -= 16;
+          }
+          break;
+
+        default:
+          buffer.position(buffer.position() + length - 1);
+          break;
+      }
+    }
+
+    return uuids;
   }
 }

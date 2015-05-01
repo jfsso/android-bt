@@ -2,7 +2,7 @@ package li.vin.bt;
 
 import android.util.Log;
 
-/*package*/ class ParamO2sEquivalenceRatio extends ParamStream<Float> {
+/*package*/ class ParamO2sEquivalenceRatio extends ParamStreamFloat {
   private static final float RATIO = 2 / 65535f;
 
   public ParamO2sEquivalenceRatio(String code) {

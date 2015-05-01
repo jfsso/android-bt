@@ -4,6 +4,7 @@ checkstyle {
     configFile rootProject.file('checkstyle.xml')
     showViolations true
     toolVersion = '6.6'
+    ignoreFailures = true
 }
 
 def variants = android.hasProperty('applicationVariants') \
@@ -17,7 +18,9 @@ variants.all { variant ->
     checkstyle.dependsOn variant.javaCompile
     checkstyle.source variant.javaCompile.source
     checkstyle.classpath = project.fileTree(variant.javaCompile.destinationDir)
+
     checkstyle.exclude('**/BuildConfig.java')
     checkstyle.exclude('**/R.java')
+
     project.tasks.getByName("check").dependsOn checkstyle
 }

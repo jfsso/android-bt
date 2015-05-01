@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
@@ -15,6 +16,7 @@ import java.util.Map;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
+import rx.functions.Func1;
 import rx.subscriptions.Subscriptions;
 
 /*package*/ class BtLeDeviceConnection extends BluetoothGattCallback implements DeviceConnection {
@@ -31,7 +33,37 @@ import rx.subscriptions.Subscriptions;
   }
 
   @Override public Observable<Void> resetDtcs() {
-    return null;
+    return serviceObservable.flatMap(new Func1<IVinliService, Observable<Void>>() {
+      @Override public Observable<Void> call(final IVinliService iVinliService) {
+        return Observable.create(new Observable.OnSubscribe<Void>() {
+          @Override public void call(final Subscriber<? super Void> subscriber) {
+            try {
+              iVinliService.resetDtcs(new IVinliServiceCallbackBool.Stub() {
+                @Override public void onCompleted() throws RemoteException {
+                  if (!subscriber.isUnsubscribed()) {
+                    subscriber.onCompleted();
+                  }
+                }
+
+                @Override public void onError(String err) throws RemoteException {
+                  if (!subscriber.isUnsubscribed()) {
+                    subscriber.onError(new RuntimeException(err));
+                  }
+                }
+
+                @Override public void onNext(boolean val) throws RemoteException {
+                  if (!subscriber.isUnsubscribed()) {
+                    subscriber.onNext(null);
+                  }
+                }
+              });
+            } catch (RemoteException e) {
+              subscriber.onError(new RuntimeException("failed to reset DTCs", e));
+            }
+          }
+        });
+      }
+    });
   }
 
   @Override public <T> Observable<T> observe(@NonNull final Param<T> param) {

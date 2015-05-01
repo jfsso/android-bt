@@ -10,15 +10,6 @@ public class DeviceService extends Service {
 
   private DeviceServiceBinder mBinder;
 
-//  @Override public void onCreate() {
-////    Looper.prepare();
-//    Looper.loop();
-//  }
-//
-//  @Override public void onDestroy() {
-//    Looper.myLooper().quit();
-//  }
-
   @Override public IBinder onBind(Intent intent) {
     Log.d(TAG, "onBind");
     if (mBinder == null) {
@@ -27,10 +18,10 @@ public class DeviceService extends Service {
     return mBinder;
   }
 
-//  @Override public boolean onUnbind(Intent intent) {
-//    Log.d(TAG, "onUnbind");
-//    mBinder.unsubscribeAll();
-//    return false;
-//  }
+  @Override public boolean onUnbind(Intent intent) {
+    Log.d(TAG, "onUnbind");
+    mBinder.unsubscribeAll();
+    return false;
+  }
 
 }

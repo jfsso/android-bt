@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
+import android.util.Log;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -39,7 +40,26 @@ import rx.subscriptions.Subscriptions;
       return Observable.error(new RuntimeException("unrecognized param"));
     }
 
-    return serviceObservable.flatMap(param.getServiceFunc(name));
+    @SuppressWarnings("unchecked")
+    Observable<T> paramObservable = (Observable<T>) mParamObservables.get(param);
+    if (paramObservable == null) {
+      Log.d(TAG, "creating param observable for " + name);
+      paramObservable = serviceObservable
+        .flatMap(param.getServiceFunc(name))
+        .doOnUnsubscribe(new Action0() {
+          @Override public void call() {
+            Log.d(TAG, "all unsubscribed from " + name);
+            mParamObservables.remove(param);
+          }
+        })
+        .share();
+
+      mParamObservables.put(param, paramObservable);
+    } else {
+      Log.d(TAG, "param observable already exists for " + name);
+    }
+
+    return paramObservable;
   }
 
   final Observable<IVinliService> serviceObservable = Observable
@@ -47,13 +67,14 @@ import rx.subscriptions.Subscriptions;
       @Override public void call(final Subscriber<? super IVinliService> subscriber) {
         final ServiceConnection serviceConnection = new ServiceConnection() {
           @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d(TAG, "connected to device service");
             if (!subscriber.isUnsubscribed()) {
               subscriber.onNext(IVinliService.Stub.asInterface(service));
-              subscriber.onCompleted();
             }
           }
 
           @Override public void onServiceDisconnected(ComponentName name) {
+            Log.d(TAG, "disconnected from device service");
             if (!subscriber.isUnsubscribed()) {
               subscriber.onCompleted();
             }
@@ -61,19 +82,21 @@ import rx.subscriptions.Subscriptions;
         };
 
         try {
+          Log.d(TAG, "binding to device service...");
           final boolean connected = mContext.bindService(new Intent(mContext, DeviceService.class),
             serviceConnection,
             Context.BIND_AUTO_CREATE);
 
           if (!connected) {
             subscriber.onError(new RuntimeException("failed to connect to Vinli device service"));
+          } else {
+            subscriber.add(Subscriptions.create(new Action0() {
+              @Override public void call() {
+                Log.d(TAG, "unbinding from service due to all unsubscribing");
+                mContext.unbindService(serviceConnection);
+              }
+            }));
           }
-
-          subscriber.add(Subscriptions.create(new Action0() {
-            @Override public void call() {
-              mContext.unbindService(serviceConnection);
-            }
-          }));
         } catch (Exception e) {
           subscriber.onError(e);
         }

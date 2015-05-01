@@ -32,6 +32,7 @@ import rx.Observable;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.functions.Action0;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.observables.ConnectableObservable;
 import rx.subjects.PublishSubject;
@@ -53,7 +54,7 @@ import rx.subscriptions.Subscriptions;
 
   @Override public void observeBool(final String name, final IVinliServiceCallbackBool cb) {
     try {
-      final Subscription sub = observe(Params.<Boolean>paramFor(name)).subscribe(new Subscriber<Boolean>() {
+      final Subscription sub = observe(name, Params.<Boolean>paramFor(name)).subscribe(new Subscriber<Boolean>() {
         @Override public void onCompleted() {
           try {
             cb.onCompleted();
@@ -96,7 +97,7 @@ import rx.subscriptions.Subscriptions;
 
   @Override public void observeDtc(final String name, final IVinliServiceCallbackDtc cb) {
     try {
-      final Subscription sub = observe(Params.<List<String>>paramFor(name)).subscribe(new Subscriber<List<String>>() {
+      final Subscription sub = observe(name, Params.<List<String>>paramFor(name)).subscribe(new Subscriber<List<String>>() {
         @Override public void onCompleted() {
           try {
             cb.onCompleted();
@@ -139,7 +140,7 @@ import rx.subscriptions.Subscriptions;
 
   @Override public void observeFloat(final String name, final IVinliServiceCallbackFloat cb) {
     try {
-      final Subscription sub = observe(Params.<Float>paramFor(name)).subscribe(new Subscriber<Float>() {
+      final Subscription sub = observe(name, Params.<Float>paramFor(name)).subscribe(new Subscriber<Float>() {
         @Override public void onCompleted() {
           try {
             cb.onCompleted();
@@ -182,7 +183,7 @@ import rx.subscriptions.Subscriptions;
 
   @Override public void observeInt(final String name, final IVinliServiceCallbackInt cb) {
     try {
-      final Subscription sub = observe(Params.<Integer>paramFor(name)).subscribe(new Subscriber<Integer>() {
+      final Subscription sub = observe(name, Params.<Integer>paramFor(name)).subscribe(new Subscriber<Integer>() {
         @Override public void onCompleted() {
           try {
             cb.onCompleted();
@@ -225,7 +226,7 @@ import rx.subscriptions.Subscriptions;
 
   @Override public void observeString(final String name, final IVinliServiceCallbackString cb) {
     try {
-      final Subscription sub = observe(Params.<String>paramFor(name)).subscribe(new Subscriber<String>() {
+      final Subscription sub = observe(name, Params.<String>paramFor(name)).subscribe(new Subscriber<String>() {
         @Override public void onCompleted() {
           try {
             cb.onCompleted();
@@ -376,24 +377,17 @@ import rx.subscriptions.Subscriptions;
     writeQueue.onNext(clearDtcsObservable);
   }
 
-  private <T, P> Observable<T> observe(@NonNull final ParamImpl<T, P> param) {
+  private <T, P> Observable<T> observe(@NonNull final String name, @NonNull final ParamImpl<T, P> param) {
+    Log.d(TAG, "observing " + name);
+
     @SuppressWarnings("unchecked")
     Observable<T> paramObservable = (Observable<T>) mParamObservables.get(param);
     if (paramObservable == null) {
+      Log.d(TAG, "creating param observable for " + name);
       @SuppressWarnings("unchecked")
       Observable<P> uuidObservable = (Observable<P>) mUuidObservables.get(param.uuid);
       if (uuidObservable == null) {
-        final Func1<BluetoothGattCharacteristic, Boolean> matchesUuid = new Func1<BluetoothGattCharacteristic, Boolean>() {
-          @Override public Boolean call(BluetoothGattCharacteristic characteristic) {
-            return param.uuid.equals(characteristic.getUuid());
-          }
-        };
-
-        final Func1<BluetoothGattCharacteristic, P> parseCharacteristic = new Func1<BluetoothGattCharacteristic, P>() {
-          @Override public P call(BluetoothGattCharacteristic characteristic) {
-            return param.parseCharacteristic(characteristic);
-          }
-        };
+        Log.d(TAG, "creating UUID observable for " + name);
 
         uuidObservable = connectionObservable
           .flatMap(new Func1<GattService, Observable<BluetoothGattCharacteristic>>() {
@@ -412,10 +406,12 @@ import rx.subscriptions.Subscriptions;
                 : null;
 
               if (readObservable == null && notiObservable == null) {
+                Log.d(TAG, "no read or notifications for " + param.uuid + " due to " + name);
                 return Observable.empty();
               }
 
               if (readObservable != null && notiObservable == null) {
+                Log.d(TAG, "queueing read for " + param.uuid + " due to " + name);
                 writeQueue.onNext(readObservable);
                 return readObservable;
               }
@@ -425,27 +421,40 @@ import rx.subscriptions.Subscriptions;
                 .map(pluckCharacteristic);
 
               if (readObservable == null) {
+                Log.d(TAG, "queueing notifications for " + param.uuid + " due to " + name);
                 writeQueue.onNext(notiObservable);
                 return notiValObservable;
               } else {
+                Log.d(TAG, "queueing read & notifications for " + param.uuid + " due to " + name);
                 writeQueue.onNext(readObservable);
                 writeQueue.onNext(notiObservable);
                 return Observable.merge(readObservable, notiValObservable);
               }
             }
           })
-          .filter(matchesUuid)
-          .map(parseCharacteristic)
+          .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
+            @Override public Boolean call(BluetoothGattCharacteristic characteristic) {
+              return param.uuid.equals(characteristic.getUuid());
+            }
+          })
+          .map(new Func1<BluetoothGattCharacteristic, P>() {
+            @Override public P call(BluetoothGattCharacteristic characteristic) {
+              Log.d(TAG, "parsing value for " + name);
+              return param.parseCharacteristic(characteristic);
+            }
+          })
           .doOnUnsubscribe(new Action0() {
             @Override
             public void call() {
-              Log.d("uuid.doOnUnsubscribe", "unsubscribing " + param.uuid);
+              Log.d(TAG, "unsubscribed " + param.uuid);
               mUuidObservables.remove(param.uuid);
             }
           })
           .share();
 
         mUuidObservables.put(param.uuid, uuidObservable);
+      } else {
+        Log.d(TAG, "UUID observable already exists for " + name);
       }
 
       paramObservable = uuidObservable
@@ -459,17 +468,24 @@ import rx.subscriptions.Subscriptions;
             return param.parseVal(s);
           }
         })
+        .doOnNext(new Action1<T>() {
+          @Override public void call(T t) {
+            Log.d(TAG, "value for " + name + ": " + t);
+          }
+        })
         .distinctUntilChanged()
         .doOnUnsubscribe(new Action0() {
           @Override
           public void call() {
-            Log.d("param.doOnUnsubscribe", "unsubscribing " + param.uuid);
+            Log.d(TAG, "unsubscribed " + name);
             mParamObservables.remove(param);
           }
         })
         .share();
 
       mParamObservables.put(param, paramObservable);
+    } else {
+      Log.d(TAG, "param observable already exists for " + name);
     }
 
     return paramObservable;
@@ -518,8 +534,8 @@ import rx.subscriptions.Subscriptions;
     }
 
     @Override public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-//    Log.i(TAG, String.format("device(%s) onCharacteristicChanged characteristic(%s)",
-//      gatt.getDevice(), characteristic.getUuid()));
+    Log.i(TAG, String.format("device(%s) onCharacteristicChanged characteristic(%s)",
+      gatt.getDevice(), characteristic.getUuid()));
       characteristicChangedObservable.onNext(new CharacteristicChangeMsg(gatt, characteristic));
     }
 
@@ -816,7 +832,7 @@ import rx.subscriptions.Subscriptions;
   }
 
   private ConnectableObservable<BluetoothGattCharacteristic> makeReadObservable(final ParamImpl<?, ?> param,
-                                                                                final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
+      final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return characteristicReadObservable
       .filter(new Func1<BluetoothGattCharacteristic, Boolean>() {
         @Override public Boolean call(BluetoothGattCharacteristic chara) {
@@ -836,7 +852,7 @@ import rx.subscriptions.Subscriptions;
   }
 
   private ConnectableObservable<DescriptorWriteMsg> makeNotiObservable(final ParamImpl<?, ?> param,
-                                                                       final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
+      final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
     return descriptorWriteObservable
       .filter(new Func1<DescriptorWriteMsg, Boolean>() {
         @Override public Boolean call(DescriptorWriteMsg msg) {
@@ -884,7 +900,7 @@ import rx.subscriptions.Subscriptions;
   }
 
   private ConnectableObservable<? extends Object> makeStopNotiObservable(final ParamImpl<?, ?> param,
-                                                                         final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
+      final BluetoothGatt gatt, final BluetoothGattDescriptor descriptor) {
     return descriptorWriteObservable
       .filter(new Func1<DescriptorWriteMsg, Boolean>() {
         @Override public Boolean call(DescriptorWriteMsg msg) {

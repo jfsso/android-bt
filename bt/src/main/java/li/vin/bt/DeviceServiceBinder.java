@@ -1009,7 +1009,9 @@ import rx.subscriptions.Subscriptions;
     final ByteBuffer buffer = ByteBuffer.wrap(advertisedData).order(ByteOrder.LITTLE_ENDIAN);
     while (buffer.remaining() > 2) {
       byte length = buffer.get();
-      if (length == 0) break;
+      if (length == 0) {
+        break;
+      }
 
       byte type = buffer.get();
       switch (type) {

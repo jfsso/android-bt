@@ -16,7 +16,8 @@ variants.all { variant ->
 
     def checkstyle = project.tasks.create "checkstyle${name.capitalize()}", Checkstyle
     checkstyle.dependsOn variant.javaCompile
-    checkstyle.source variant.javaCompile.source
+//    checkstyle.source variant.javaCompile.source
+    checkstyle.source 'src/main/java'
     checkstyle.classpath = project.fileTree(variant.javaCompile.destinationDir)
 
     checkstyle.exclude('**/BuildConfig.java')

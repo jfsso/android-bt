@@ -9,6 +9,12 @@ Vinli Android Bluetooth SDK
 An Android client for interacting with the Vinli bluetooth device from within your application.
 [Sample App](https://github.com/vinli/android-demo)
 
+Build
+
+-----------
+
+[![Build Status](https://travis-ci.org/vinli/android-bt.svg?branch=master)](https://travis-ci.org/vinli/android-bt)
+
 Conventions
 -----------
 ### [RxJava](https://github.com/ReactiveX/RxJava/wiki)

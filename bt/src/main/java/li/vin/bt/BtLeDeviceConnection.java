@@ -10,6 +10,7 @@ import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
+import java.lang.ref.WeakReference;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
@@ -24,12 +25,18 @@ import rx.subscriptions.Subscriptions;
 
   private final Map<Param<?>, Observable<?>> mParamObservables = new IdentityHashMap<>();
 
-  private final Context mContext;
-  private final String mUnlockKey;
+  private WeakReference<Context> mContextRef;
 
-  public BtLeDeviceConnection(@NonNull Context context, @NonNull String unlockKey) {
-    mContext = context;
-    mUnlockKey = unlockKey;
+  public BtLeDeviceConnection(@NonNull Context context) {
+    updateContext(context);
+  }
+
+  private Context context() {
+    return mContextRef.get();
+  }
+
+  /*package*/ void updateContext(@NonNull Context context) {
+    mContextRef = new WeakReference<>(context);
   }
 
   @Override public Observable<Void> resetDtcs() {
@@ -115,9 +122,10 @@ import rx.subscriptions.Subscriptions;
 
         try {
           Log.d(TAG, "binding to device service...");
-          final boolean connected = mContext.bindService(new Intent(mContext, DeviceService.class),
-            serviceConnection,
-            Context.BIND_AUTO_CREATE);
+          Context context = context();
+          final boolean connected = context != null
+              && context.bindService(new Intent(context, DeviceService.class),
+                  serviceConnection, Context.BIND_AUTO_CREATE);
 
           if (!connected) {
             subscriber.onError(new RuntimeException("failed to connect to Vinli device service"));
@@ -125,7 +133,8 @@ import rx.subscriptions.Subscriptions;
             subscriber.add(Subscriptions.create(new Action0() {
               @Override public void call() {
                 Log.d(TAG, "unbinding from service due to all unsubscribing");
-                mContext.unbindService(serviceConnection);
+                Context context = context();
+                if (context != null) context.unbindService(serviceConnection);
               }
             }));
           }

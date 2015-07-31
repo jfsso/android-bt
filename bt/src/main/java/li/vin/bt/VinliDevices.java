@@ -4,11 +4,13 @@ import android.content.Context;
 
 public final class VinliDevices {
 
-  private static DeviceConnection sDeviceConn = null;
+  private static BtLeDeviceConnection sDeviceConn = null;
 
-  public static final DeviceConnection createDeviceConnection(Context context, String unlockKey) {
+  public static final DeviceConnection createDeviceConnection(Context context) {
     if (sDeviceConn == null) {
-      sDeviceConn = new BtLeDeviceConnection(context, unlockKey);
+      sDeviceConn = new BtLeDeviceConnection(context);
+    } else {
+      sDeviceConn.updateContext(context);
     }
 
     return sDeviceConn;

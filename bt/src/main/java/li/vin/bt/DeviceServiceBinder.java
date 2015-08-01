@@ -612,7 +612,7 @@ import rx.subscriptions.Subscriptions;
 
       final BluetoothAdapter.LeScanCallback listener = new BluetoothAdapter.LeScanCallback() {
         @Override public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-          Log.d(TAG, "Found device " + device + " UUIDs: " + Arrays.toString(device.getUuids()));
+          //Log.d(TAG, "Found device " + device + " UUIDs: " + Arrays.toString(device.getUuids()));
 
           final List<UUID> uuids = parseUuids(scanRecord);
           for (UUID uuid : parseUuids(scanRecord)) {
@@ -687,8 +687,8 @@ import rx.subscriptions.Subscriptions;
       return serviceObservable;
     }
   })
-  .flatMap(new Func1<ServiceMsg, Observable<GattService>>() {
-    @Override public Observable<GattService> call(ServiceMsg msg) {
+  .map(new Func1<ServiceMsg, GattService>() {
+    @Override public GattService call(final ServiceMsg msg) {
       if (BluetoothGatt.GATT_SUCCESS != msg.status) {
         throw new RuntimeException("failed to find services"); // TODO: better error
       }
@@ -698,37 +698,40 @@ import rx.subscriptions.Subscriptions;
         throw new RuntimeException("service not found: " + Uuids.SERVICE); // TODO: better error
       }
 
-      Log.d(TAG, "found Vinli service. Unlocking device...");
+      Log.d(TAG, "found Vinli service...");
+      return new GattService(msg.gatt, service);
 
-      final BluetoothGattCharacteristic characteristic = service.getCharacteristic(Uuids.UNLOCK);
-      if (characteristic == null) {
-        throw new RuntimeException("no such characteristic: " + Uuids.UNLOCK);
-      }
-
-      // TODO: get unlock key from app
-      characteristic.setValue("123123".getBytes(Charset.forName("ASCII")));
-      if (!msg.gatt.writeCharacteristic(characteristic)) {
-        throw new RuntimeException("failed to start write to unlock device");
-      }
-
-      return characteristicWriteObservable
-        .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
-          @Override public Boolean call(CharacteristicWriteMsg msg) {
-            return Uuids.UNLOCK.equals(msg.characteristic.getUuid());
-          }
-        })
-        .first()
-        .map(new Func1<CharacteristicWriteMsg, GattService>() {
-          @Override public GattService call(CharacteristicWriteMsg msg) {
-            if (BluetoothGatt.GATT_SUCCESS != msg.status) {
-              throw new RuntimeException("failed to unlock service: " + Utils.gattStatus(msg.status));
-            }
-
-            Log.d(TAG, "device unlocked");
-
-            return new GattService(msg.gatt, service);
-          }
-        });
+      // Unlock codes no longer used - uncomment this to reintroduce concept
+      //Log.d(TAG, "found Vinli service. Unlocking device...");
+      //
+      //final BluetoothGattCharacteristic characteristic = service.getCharacteristic(Uuids.UNLOCK);
+      //if (characteristic == null) {
+      //  throw new RuntimeException("no such characteristic: " + Uuids.UNLOCK);
+      //}
+      //
+      //characteristic.setValue("123123".getBytes(Charset.forName("ASCII")));
+      //if (!msg.gatt.writeCharacteristic(characteristic)) {
+      //  throw new RuntimeException("failed to start write to unlock device");
+      //}
+      //
+      //return characteristicWriteObservable
+      //  .filter(new Func1<CharacteristicWriteMsg, Boolean>() {
+      //    @Override public Boolean call(CharacteristicWriteMsg msg) {
+      //      return Uuids.UNLOCK.equals(msg.characteristic.getUuid());
+      //    }
+      //  })
+      //  .first()
+      //  .map(new Func1<CharacteristicWriteMsg, GattService>() {
+      //    @Override public GattService call(CharacteristicWriteMsg msg) {
+      //      if (BluetoothGatt.GATT_SUCCESS != msg.status) {
+      //        throw new RuntimeException("failed to unlock service: " + Utils.gattStatus(msg.status));
+      //      }
+      //
+      //      Log.d(TAG, "device unlocked");
+      //
+      //      return new GattService(msg.gatt, service);
+      //    }
+      //  });
     }
   })
   .takeUntil(connectionStateObservable.filter(new Func1<ConnectionStateChangeMsg, Boolean>() {

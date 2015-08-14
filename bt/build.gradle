@@ -23,11 +23,8 @@ android {
 
 dependencies {
   compile fileTree(dir: 'libs', include: ['*.jar'])
-  compile 'com.android.support:appcompat-v7:22.2.1'
+  compile 'com.android.support:support-annotations:22.2.+'
   compile 'io.reactivex:rxjava:1.0.+'
-  compile 'io.reactivex:rxandroid:0.+'
-  compile 'io.reactivex:rxandroid-framework:0.+'
-  compile 'com.android.support:support-annotations:22.1.+'
 }
 
 apply from: rootProject.file('gradle/checkstyle.gradle')

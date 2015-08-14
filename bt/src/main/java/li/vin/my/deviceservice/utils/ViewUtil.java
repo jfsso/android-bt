@@ -1,9 +1,9 @@
 package li.vin.my.deviceservice.utils;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.support.annotation.NonNull;
-import android.support.v7.app.AlertDialog;
 
 /**
  * Created by christophercasey on 8/6/15.

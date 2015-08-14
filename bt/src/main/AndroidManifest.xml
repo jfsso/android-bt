@@ -1,21 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="li.vin.bt">
+    package="li.vin.my.deviceservice"
+    >
 
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+  <application
+      android:allowBackup="true"
+      android:label="@string/app_name"
+      >
 
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+    <receiver
+        android:name=".DeviceChoiceResultReceiver"
+        android:exported="true"
+        >
+      <intent-filter>
+        <action android:name="li.vin.action.DEVICE_CHOSEN"/>
+      </intent-filter>
+    </receiver>
 
-    <application>
-        <service
-            android:name="li.vin.bt.DeviceService"
-            android:exported="true"
-            android:label="Vinli Device Service"
-            android:process="li.vin.bt.deviceService">
+  </application>
 
-            <intent-filter>
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-            </intent-filter>
-        </service>
-    </application>
 </manifest>

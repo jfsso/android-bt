@@ -1,0 +1,6 @@
+<resources>
+  <string name="app_name">Vinli Device Service Interface</string>
+  <string name="my_vinli_package_name">li.vin.my</string>
+  <string name="device_service_component_name">li.vin.my.deviceservice.DevServ</string>
+  <string name="test_fake_install_flow_package">com.rdio.android.ui</string>
+</resources>

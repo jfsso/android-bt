@@ -29,7 +29,7 @@ public final class Params {
   };
 
   /**
-   * Calculated Load Value<br/>
+   * Calculated Load Value<br>
    * units: %
    */
   public static final Param<Float> CALCULATED_LOAD_VALUE = new ParamStreamFloat("04") {
@@ -49,7 +49,7 @@ public final class Params {
   };
 
   /**
-   * Control Module Voltage<br/>
+   * Control Module Voltage<br>
    * units: V
    */
   public static final Param<Float> CONTROL_MODULE_VOLTAGE = new ParamStreamFloat("42") {
@@ -62,7 +62,7 @@ public final class Params {
   };
 
   /**
-   * Coolant temperature<br/>
+   * Coolant temperature<br>
    * units: °C
    */
   public static final Param<Float> COOLANT_TEMP_C = new ParamStreamFloat("05") {
@@ -74,7 +74,7 @@ public final class Params {
   };
 
   /**
-   * Coolant temperature<br/>
+   * Coolant temperature<br>
    * units: °F
    */
   public static final Param<Float> COOLANT_TEMP_F = new ParamStreamFloat("05") {
@@ -100,7 +100,7 @@ public final class Params {
   };
 
   /**
-   * Fuel level input<br/>
+   * Fuel level input<br>
    * units: %
    */
   public static final Param<Float> FUEL_LEVEL_INPUT = new ParamStreamFloat("2F") {
@@ -112,7 +112,7 @@ public final class Params {
   };
 
   /**
-   * Mass Airflow<br/>
+   * Mass Airflow<br>
    * units: g/s
    */
   public static final Param<Float> MASS_AIRFLOW = new ParamStreamFloat("10") {
@@ -130,7 +130,7 @@ public final class Params {
   public static final Param<Float> O2S_1A_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("24");
 
   /**
-   * Oxygen Sensor Bank 1 - sensor 1 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 1 - sensor 1 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_1A_VOLTAGE = new ParamO2sVoltage("24");
@@ -141,7 +141,7 @@ public final class Params {
   public static final Param<Float> O2S_1B_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("25");
 
   /**
-   * Oxygen Sensor Bank 1 - sensor 2 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 1 - sensor 2 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_1B_VOLTAGE = new ParamO2sVoltage("25");
@@ -152,7 +152,7 @@ public final class Params {
   public static final Param<Float> O2S_1C_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("26");
 
   /**
-   * Oxygen Sensor Bank 1 - sensor 3 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 1 - sensor 3 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_1C_VOLTAGE = new ParamO2sVoltage("26");
@@ -163,7 +163,7 @@ public final class Params {
   public static final Param<Float> O2S_1D_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("27");
 
   /**
-   * Oxygen Sensor Bank 1 - sensor 4 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 1 - sensor 4 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_1D_VOLTAGE = new ParamO2sVoltage("27");
@@ -174,7 +174,7 @@ public final class Params {
   public static final Param<Float> O2S_2A_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("28");
 
   /**
-   * Oxygen Sensor Bank 2 - sensor 1 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 2 - sensor 1 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_2A_VOLTAGE = new ParamO2sVoltage("28");
@@ -185,7 +185,7 @@ public final class Params {
   public static final Param<Float> O2S_2B_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("29");
 
   /**
-   * Oxygen Sensor Bank 2 - sensor 2 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 2 - sensor 2 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_2B_VOLTAGE = new ParamO2sVoltage("29");
@@ -196,7 +196,7 @@ public final class Params {
   public static final Param<Float> O2S_2C_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("2A");
 
   /**
-   * Oxygen Sensor Bank 2 - sensor 3 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 2 - sensor 3 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_2C_VOLTAGE = new ParamO2sVoltage("2A");
@@ -207,13 +207,13 @@ public final class Params {
   public static final Param<Float> O2S_2D_EQUIVALENCE_RATIO = new ParamO2sEquivalenceRatio("2B");
 
   /**
-   * Oxygen Sensor Bank 2 - sensor 4 (wide range 02S): Voltage<br/>
+   * Oxygen Sensor Bank 2 - sensor 4 (wide range 02S): Voltage<br>
    * units: V
    */
   public static final Param<Float> O2S_2D_VOLTAGE = new ParamO2sVoltage("2B");
 
   /**
-   * Revolutions per Minute<br/>
+   * Revolutions per Minute<br>
    * units: r/m
    */
   public static final Param<Float> RPM = new ParamStreamFloat("0C", Uuids.RPM, true) {
@@ -226,7 +226,7 @@ public final class Params {
   };
 
   /**
-   * Runtime since engine start<br/>
+   * Runtime since engine start<br>
    * units: s
    */
   public static final Param<Integer> RUNTIME_SINCE_ENGINE_START = new ParamStreamInt("1F") {
@@ -239,7 +239,7 @@ public final class Params {
   };
 
   /**
-   * Vehicle speed<br/>
+   * Vehicle speed<br>
    * units: km/h
    */
   public static final Param<Integer> SPEED_KPH = new ParamStreamInt("0D") {
@@ -249,7 +249,7 @@ public final class Params {
   };
 
   /**
-   * Vehicle speed<br/>
+   * Vehicle speed<br>
    * units: m/h
    */
   public static final Param<Integer> SPEED_MPH = new ParamStreamInt("0D") {

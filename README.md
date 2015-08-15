@@ -21,6 +21,11 @@ Conventions
 The developer interfaces with the SDK using reactive Observables and Subscriptions.
 All data from the device is streamed via Observable, and the data stream is stopped by unsubscribing from the subscription.
 
+Docs
+----
+
+### [JavaDocs](http://vinli.github.io/android-bt/)
+
 Standard Flow
 -------------
 ### Obtain Device Unlock Key
@@ -30,25 +35,25 @@ TODO: will be needed in the future, but dev devices are currently unlocked.
 ```java
   List<Subscription> subscriptions = new ArrayList<>();
   Fragment self = this;
-  
+
   final DeviceConnection deviceConn = VinliDevices.createDeviceConnection(getActivity(), "123123");
-  
+
   Subscription rpmSub = AppObservable
     .bindFragment(self, deviceConn.observe(Params.RPM))
     .subscribe(new Subscriber<Float>() {
       @Override public void onCompleted() {
         // end of stream reached
       }
-  
+
       @Override public void onError(Throwable e) {
         // and error happened
       }
-  
+
       @Override public void onNext(Float val) {
         // next value available
       }
     });
-  
+
   subscriptions.add(rpmSub);
 ```
 

@@ -1,4 +1,9 @@
+group = project.property('vinli.groupId')
+version = project.property('vinli.version')
+
 apply plugin: 'com.android.library'
+apply from: file('../gradle/checkstyle.gradle')
+apply from: file('../gradle/javadoc.gradle')
 
 android {
   compileSdkVersion 22
@@ -10,12 +15,19 @@ android {
     versionCode 1
     versionName "1.0"
   }
+
   buildTypes {
     release {
       minifyEnabled false
       proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
   }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_7
+    targetCompatibility JavaVersion.VERSION_1_7
+  }
+
   lintOptions {
     abortOnError false
   }
@@ -27,4 +39,5 @@ dependencies {
   compile 'io.reactivex:rxjava:1.0.+'
 }
 
-apply from: rootProject.file('gradle/checkstyle.gradle')
+apply from: file('../gradle/mavenize.gradle')
+apply from: file('../gradle/bintray-upload.gradle')

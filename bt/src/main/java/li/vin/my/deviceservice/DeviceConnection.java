@@ -22,4 +22,7 @@ public interface DeviceConnection {
 
   /** Get the URL for the icon image of the current device. */
   @Nullable String deviceIcon();
+
+  /** Get the device id of the current device (valid for backend data lookup). */
+  @NonNull String deviceId();
 }

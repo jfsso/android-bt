@@ -16,7 +16,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
-import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 import java.lang.ref.WeakReference;
@@ -28,26 +27,29 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
 
+import static android.text.TextUtils.getTrimmedLength;
+
 public final class VinliDevices {
   private static final String TAG = VinliDevices.class.getSimpleName();
   private static final String SHARED_PREFS_NAME = TAG + ".sharedprefs";
   private static final String CHIP_ID_KEY = TAG + ".chipid";
   private static final String DEV_NAME_KEY = TAG + ".devicename";
   private static final String DEV_IC_KEY = TAG + ".deviceicon";
+  private static final String DEV_ID_KEY = TAG + ".deviceid";
 
   private static volatile BtLeDeviceConnection deviceConn = null;
 
   private static BtLeDeviceConnection makeOrUpdateConnection(Context context, String chipId,
-      String name, String icon) {
+      String name, String icon, String id) {
     BtLeDeviceConnection result;
     synchronized (VinliDevices.class) {
       result = deviceConn;
       if (result == null) {
-        deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon);
+        deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon, id);
       } else {
         if (!deviceConn.chipId.equals(chipId)) {
           deviceConn.shutdown();
-          deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon);
+          deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon, id);
         } else {
           deviceConn.updateContext(context);
         }
@@ -95,6 +97,7 @@ public final class VinliDevices {
           .putString(CHIP_ID_KEY, null)
           .putString(DEV_NAME_KEY, null)
           .putString(DEV_IC_KEY, null)
+          .putString(DEV_ID_KEY, null)
           .apply();
     }
 
@@ -116,9 +119,11 @@ public final class VinliDevices {
             String chipId = prefs.getString(CHIP_ID_KEY, null);
             String devName = prefs.getString(DEV_NAME_KEY, null);
             String devIcon = prefs.getString(DEV_IC_KEY, null);
+            String devId = prefs.getString(DEV_ID_KEY, null);
 
-            if (chipId != null && TextUtils.getTrimmedLength(chipId) != 0) {
-              subscriber.onNext(makeOrUpdateConnection(context, chipId, devName, devIcon));
+            if (chipId != null && getTrimmedLength(chipId) != 0 &&
+                devId != null && getTrimmedLength(devId) != 0) {
+              subscriber.onNext(makeOrUpdateConnection(context, chipId, devName, devIcon, devId));
               subscriber.onCompleted();
               return;
             }
@@ -141,9 +146,12 @@ public final class VinliDevices {
                 String chipId = prefs.getString(CHIP_ID_KEY, null);
                 String devName = prefs.getString(DEV_NAME_KEY, null);
                 String devIcon = prefs.getString(DEV_IC_KEY, null);
+                String devId = prefs.getString(DEV_ID_KEY, null);
 
-                if (chipId != null && TextUtils.getTrimmedLength(chipId) != 0) {
-                  subscriber.onNext(makeOrUpdateConnection(context, chipId, devName, devIcon));
+                if (chipId != null && getTrimmedLength(chipId) != 0 &&
+                    devId != null && getTrimmedLength(devId) != 0) {
+                  subscriber.onNext(
+                      makeOrUpdateConnection(context, chipId, devName, devIcon, devId));
                   subscriber.onCompleted();
                 } else {
                   subscriber.onError(new RuntimeException("device not chosen."));
@@ -405,13 +413,15 @@ public final class VinliDevices {
       String chipId = intent == null ? null : intent.getStringExtra("li.vin.my.chip_id");
       String devName = intent == null ? null : intent.getStringExtra("li.vin.my.device_name");
       String devIcon = intent == null ? null : intent.getStringExtra("li.vin.my.device_icon");
-      if (chipId != null && TextUtils.getTrimmedLength(chipId) != 0) {
+      String devId = intent == null ? null : intent.getStringExtra("li.vin.my.device_id");
+      if (chipId != null && getTrimmedLength(chipId) != 0) {
         context.getApplicationContext()
             .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(CHIP_ID_KEY, chipId)
             .putString(DEV_NAME_KEY, devName)
             .putString(DEV_IC_KEY, devIcon)
+            .putString(DEV_ID_KEY, devId)
             .apply();
       }
       reqChipIdSubject.onNext(null);

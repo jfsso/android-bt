@@ -40,12 +40,14 @@ import static android.text.TextUtils.getTrimmedLength;
   /*package*/ final String chipId;
   /*package*/ final String deviceName;
   /*package*/ final String deviceIcon;
+  /*package*/ final String deviceId;
 
   public BtLeDeviceConnection(@NonNull Context context, @NonNull String chipId, String deviceName,
-      String deviceIcon) {
+      String deviceIcon, @NonNull String deviceId) {
     this.chipId = chipId;
     this.deviceName = deviceName;
     this.deviceIcon = deviceIcon;
+    this.deviceId = deviceId;
     updateContext(context);
   }
 
@@ -67,6 +69,10 @@ import static android.text.TextUtils.getTrimmedLength;
 
   @Override public String deviceIcon() {
     return deviceIcon;
+  }
+
+  @NonNull @Override public String deviceId() {
+    return deviceId;
   }
 
   @NonNull @Override public Observable<Void> resetDtcs() {

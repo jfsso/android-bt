@@ -1,12 +1,25 @@
 package li.vin.my.deviceservice;
 
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import rx.Observable;
 
 public interface DeviceConnection {
-  <T> Observable<T> observe(@NonNull Param<T> pid);
+  /** Observe a given parameter. */
+  @NonNull <T> Observable<T> observe(@NonNull Param<T> pid);
 
-  Observable<Void> resetDtcs();
+  /** Reset the DTCs. */
+  @NonNull Observable<Void> resetDtcs();
 
-  Observable<SupportedPids> supportedPids();
+  /** Determine which OBD-II PIDs are supported. */
+  @NonNull Observable<SupportedPids> supportedPids();
+
+  /** Get the chip ID of the current device. */
+  @Nullable String chipId();
+
+  /** Get the name of the current device. */
+  @Nullable String deviceName();
+
+  /** Get the URL for the icon image of the current device. */
+  @Nullable String deviceIcon();
 }

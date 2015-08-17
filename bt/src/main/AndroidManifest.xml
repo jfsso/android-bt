@@ -2,19 +2,12 @@
     package="li.vin.my.deviceservice"
     >
 
+  <uses-permission android:name="android.permission.BLUETOOTH"/>
+
   <application
       android:allowBackup="true"
       android:label="@string/app_name"
       >
-
-    <receiver
-        android:name=".DeviceChoiceResultReceiver"
-        android:exported="true"
-        >
-      <intent-filter>
-        <action android:name="li.vin.action.DEVICE_CHOSEN"/>
-      </intent-filter>
-    </receiver>
 
   </application>
 

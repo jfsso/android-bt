@@ -38,9 +38,14 @@ import static android.text.TextUtils.getTrimmedLength;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private WeakReference<Context> contextRef;
   /*package*/ final String chipId;
+  /*package*/ final String deviceName;
+  /*package*/ final String deviceIcon;
 
-  public BtLeDeviceConnection(@NonNull Context context, @NonNull String chipId) {
+  public BtLeDeviceConnection(@NonNull Context context, @NonNull String chipId, String deviceName,
+      String deviceIcon) {
     this.chipId = chipId;
+    this.deviceName = deviceName;
+    this.deviceIcon = deviceIcon;
     updateContext(context);
   }
 
@@ -52,7 +57,19 @@ import static android.text.TextUtils.getTrimmedLength;
     contextRef = new WeakReference<>(context);
   }
 
-  @Override public Observable<Void> resetDtcs() {
+  @Override public String chipId() {
+    return chipId;
+  }
+
+  @Override public String deviceName() {
+    return deviceName;
+  }
+
+  @Override public String deviceIcon() {
+    return deviceIcon;
+  }
+
+  @NonNull @Override public Observable<Void> resetDtcs() {
     return serviceObservable.flatMap(new Func1<IDevServ, Observable<Void>>() {
       @Override public Observable<Void> call(final IDevServ iVinliService) {
         return Observable.create(new Observable.OnSubscribe<Void>() {
@@ -108,7 +125,7 @@ import static android.text.TextUtils.getTrimmedLength;
     });
   }
 
-  @Override public Observable<SupportedPids> supportedPids() {
+  @NonNull @Override public Observable<SupportedPids> supportedPids() {
     return observe(Params.PIDS).map(new Func1<String, SupportedPids>() {
       @Override public SupportedPids call(String rawPids) {
         return new SupportedPids(rawPids);
@@ -116,7 +133,7 @@ import static android.text.TextUtils.getTrimmedLength;
     });
   }
 
-  @Override public <T> Observable<T> observe(@NonNull final Param<T> param) {
+  @NonNull @Override public <T> Observable<T> observe(@NonNull final Param<T> param) {
     final String name = Params.nameFor(param);
     if (name == null) {
       return Observable.error(new RuntimeException("unrecognized param"));

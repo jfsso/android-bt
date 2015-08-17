@@ -9,6 +9,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Handler;
@@ -69,8 +70,9 @@ public final class VinliDevices {
    * Attempt to make a connection with My Vinli. The returned {@link Observable} can be flatmapped
    * to any My Vinli device capabilities exposed by the {@link DeviceConnection} interface.
    * It is important to note that this Observable will immediately emit an error if the My Vinli
-   * app is not installed, so it is advisable to use {@link #isMyVinliInstalled(Context)} and
-   * {@link #launchMarketToInstallMyVinli(Context)} to handle this scenario in advance.
+   * app is not installed, so it is advisable to use {@link #isMyVinliInstalledAndUpdated(Context)}
+   * and
+   * {@link #launchMarketToMyVinli(Context)} to handle this scenario in advance.
    *
    * @param clientId OAuth Client ID of the application requesting a connection.
    * @param redirectUri OAuth redirect URI of the application requesting a connection.
@@ -80,9 +82,10 @@ public final class VinliDevices {
    */
   public static @NonNull Observable<DeviceConnection> connect(@NonNull final Context context,
       @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshChoice) {
-    if (!isMyVinliInstalled(context)) {
-      return Observable.error(new Exception("My Vinli is not installed - use isMyVinliInstalled "
-          + "and launchMarketToInstallMyVinli to handle this error."));
+    if (!isMyVinliInstalledAndUpdated(context)) {
+      return Observable.error(new Exception(
+          "My Vinli is not installed - use isMyVinliInstalledAndUpdated "
+              + "and launchMarketToMyVinli to handle this error."));
     }
 
     if (forceFreshChoice) {
@@ -173,36 +176,38 @@ public final class VinliDevices {
   /**
    * Check whether or not My Vinli is currently installed. If this returns false, My Vinli
    * must be installed before a {@link DeviceConnection} will be available. In this scenario, it
-   * is advisable to call {@link #launchMarketToInstallMyVinli(Context)} in response to direct
+   * is advisable to call {@link #launchMarketToMyVinli(Context)} in response to direct
    * user interaction, such as a dialog requesting that the user install My Vinli.
    *
    * @see #createMyVinliInstallRequestDialog(Context)
    */
-  public static boolean isMyVinliInstalled(Context context) {
+  public static boolean isMyVinliInstalledAndUpdated(Context context) {
     PackageManager pm = context.getPackageManager();
     //noinspection ConstantConditions
     String pkgName =
         context.getResources().getBoolean(R.bool.test_fake_install_flow) ? context.getString(
             R.string.test_fake_install_flow_package)
             : context.getString(R.string.my_vinli_package_name);
-    boolean installed;
+    int versionCode;
     try {
       pm.getPackageInfo(pkgName, PackageManager.GET_ACTIVITIES);
-      installed = true;
+      PackageInfo packageInfo = pm.getPackageInfo(pkgName, 0);
+      versionCode = packageInfo.versionCode;
     } catch (PackageManager.NameNotFoundException e) {
-      installed = false;
+      return false;
     }
-    return installed;
+    return versionCode >= context.getResources().getInteger(R.integer.min_supported_myvinli_ver);
   }
 
   /**
    * Launch a market Activity for installation of My Vinli. It is best to call this in response
-   * to direct user interaction after {@link #isMyVinliInstalled(Context)} returns false, such as
+   * to direct user interaction after {@link #isMyVinliInstalledAndUpdated(Context)} returns false,
+   * such as
    * in a dialog requesting that the user install My Vinli.
    *
    * @see #createMyVinliInstallRequestDialog(Context)
    */
-  public static void launchMarketToInstallMyVinli(@NonNull Context context) {
+  public static void launchMarketToMyVinli(@NonNull Context context) {
     String pkgName =
         context.getResources().getBoolean(R.bool.test_fake_install_flow) ? context.getString(
             R.string.test_fake_install_flow_package)
@@ -215,7 +220,8 @@ public final class VinliDevices {
         context.startActivity(new Intent(Intent.ACTION_VIEW,
             Uri.parse("https://play.google.com/store/apps/details?id=" + pkgName)));
       } catch (Exception e2) {
-        Toast.makeText(context, "Could not install My Vinli app.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, "Could not launch market to My Vinli app.", Toast.LENGTH_SHORT)
+            .show();
       }
     }
   }
@@ -227,12 +233,13 @@ public final class VinliDevices {
    */
   public static @NonNull AlertDialog createMyVinliInstallRequestDialog(@NonNull Context context) {
     final WeakReference<Context> ctx = new WeakReference<>(context);
-    return new AlertDialog.Builder(context).setTitle("Install My Vinli")
-        .setMessage("My Vinli must be installed for this app to function properly. Install now?")
+    return new AlertDialog.Builder(context).setTitle("Get My Vinli")
+        .setMessage("My Vinli must be installed and fully updated for this app to function "
+            + "properly. Install or update now?")
         .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
           @Override public void onClick(DialogInterface dialog, int which) {
             Context context = ctx.get();
-            if (context != null) launchMarketToInstallMyVinli(context);
+            if (context != null) launchMarketToMyVinli(context);
           }
         })
         .setNegativeButton(android.R.string.no, null)
@@ -312,46 +319,45 @@ public final class VinliDevices {
 
   private static final AtomicReference<Context> appCtxRef = new AtomicReference<>();
   private static final PublishSubject<Void> enableBtSubject = PublishSubject.create();
-  private static final Observable<Void> enableBtObs =
-      enableBtSubject.doOnSubscribe(new Action0() {
-        @Override public void call() {
-          Log.i(TAG, "enableBtObs onSubscribe.");
-          boolean registered;
-          try {
-            Intent i = new Intent();
-            i.setClassName("li.vin.my", "li.vin.my.EnableBluetoothActivity");
-            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            appCtxRef.get()
-                .getApplicationContext()
-                .registerReceiver(enableBtReceiver,
-                    new IntentFilter("li.vin.action.BLUETOOTH_ENABLED"));
-            appCtxRef.get().getApplicationContext().startActivity(i);
-            registered = true;
-          } catch (Exception e) {
-            Log.e(TAG, "registerReceiver li.vin.action.BLUETOOTH_ENABLED " + e);
-            registered = false;
-          }
-          if (registered) {
-            new Handler(Looper.getMainLooper()).postAtTime(new Runnable() {
-              @Override public void run() {
-                enableBtSubject.onNext(null);
-              }
-            }, enableBtReceiver, SystemClock.uptimeMillis() + 10000);
-          } else {
+  private static final Observable<Void> enableBtObs = enableBtSubject.doOnSubscribe(new Action0() {
+    @Override public void call() {
+      Log.i(TAG, "enableBtObs onSubscribe.");
+      boolean registered;
+      try {
+        Intent i = new Intent();
+        i.setClassName("li.vin.my", "li.vin.my.EnableBluetoothActivity");
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        appCtxRef.get()
+            .getApplicationContext()
+            .registerReceiver(enableBtReceiver,
+                new IntentFilter("li.vin.action.BLUETOOTH_ENABLED"));
+        appCtxRef.get().getApplicationContext().startActivity(i);
+        registered = true;
+      } catch (Exception e) {
+        Log.e(TAG, "registerReceiver li.vin.action.BLUETOOTH_ENABLED " + e);
+        registered = false;
+      }
+      if (registered) {
+        new Handler(Looper.getMainLooper()).postAtTime(new Runnable() {
+          @Override public void run() {
             enableBtSubject.onNext(null);
           }
-        }
-      }).doOnNext(new Action1<Void>() {
-        @Override public void call(Void aVoid) {
-          Log.i(TAG, "enableBtObs onNext.");
-          new Handler(Looper.getMainLooper()).removeCallbacksAndMessages(enableBtReceiver);
-          appCtxRef.get().unregisterReceiver(enableBtReceiver);
-        }
-      }).doOnUnsubscribe(new Action0() {
-        @Override public void call() {
-          Log.i(TAG, "enableBtObs onUnsubscribe.");
-        }
-      }).publish().refCount();
+        }, enableBtReceiver, SystemClock.uptimeMillis() + 10000);
+      } else {
+        enableBtSubject.onNext(null);
+      }
+    }
+  }).doOnNext(new Action1<Void>() {
+    @Override public void call(Void aVoid) {
+      Log.i(TAG, "enableBtObs onNext.");
+      new Handler(Looper.getMainLooper()).removeCallbacksAndMessages(enableBtReceiver);
+      appCtxRef.get().unregisterReceiver(enableBtReceiver);
+    }
+  }).doOnUnsubscribe(new Action0() {
+    @Override public void call() {
+      Log.i(TAG, "enableBtObs onUnsubscribe.");
+    }
+  }).publish().refCount();
 
   private static final BroadcastReceiver enableBtReceiver = new BroadcastReceiver() {
     @Override public void onReceive(Context context, Intent intent) {

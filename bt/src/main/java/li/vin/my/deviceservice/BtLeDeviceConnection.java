@@ -56,7 +56,7 @@ import static android.text.TextUtils.getTrimmedLength;
   }
 
   /*package*/ void updateContext(@NonNull Context context) {
-    contextRef = new WeakReference<>(context);
+    contextRef = new WeakReference<>(context.getApplicationContext());
   }
 
   @Override public String chipId() {

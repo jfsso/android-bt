@@ -238,11 +238,13 @@ import static android.text.TextUtils.getTrimmedLength;
 
   private final ServiceConnection servConn = new ServiceConnection() {
     @Override public void onServiceConnected(ComponentName name, final IBinder service) {
+      Log.i(TAG, "onServiceConnected");
       devServ = IDevServ.Stub.asInterface(service);
       dispatchAndClear(runOnServiceConnected);
     }
 
     @Override public void onServiceDisconnected(ComponentName name) {
+      Log.i(TAG, "onServiceDisconnected");
       devServ = null;
     }
   };

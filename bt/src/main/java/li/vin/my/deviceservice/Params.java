@@ -6,8 +6,6 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import rx.Observable;
-import rx.functions.Func1;
 
 public final class Params {
   public static final Param<Float> ACCEL_X = new ParamAccelFloat() {
@@ -94,7 +92,7 @@ public final class Params {
       return Arrays.asList(val.split(",")); // remove "D:" from beginning
     }
 
-    @Override Func1<IDevServ, Observable<List<String>>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override DeviceServiceFunc<List<String>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncDtc(chipId, name);
     }
   };
@@ -269,7 +267,7 @@ public final class Params {
       return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
     }
 
-    @Override Func1<IDevServ, Observable<Boolean>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncBool(chipId, name);
     }
   };
@@ -279,7 +277,7 @@ public final class Params {
       return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
     }
 
-    @Override Func1<IDevServ, Observable<Boolean>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncBool(chipId, name);
     }
   };

@@ -3,18 +3,13 @@ package li.vin.my.deviceservice;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.widget.Toast;
@@ -56,6 +51,17 @@ public final class VinliDevices {
       }
     }
     return result;
+  }
+
+  /** Determine whether or not the given {@link Intent} is relevant to the current application.
+   * If this returns false, the data is invalid or possibly related to an unknown or unrelated
+   * Vinli device, and should be ignored. */
+  public static boolean intentIsRelevant(@NonNull Context context, Intent intent) {
+    if (intent == null) return false;
+    String intentTarget = intent.getStringExtra("li.vin.my.chip_id");
+    return intentTarget != null && intentTarget.equals(context.getApplicationContext()
+        .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
+        .getString(CHIP_ID_KEY, null));
   }
 
   /**
@@ -330,48 +336,29 @@ public final class VinliDevices {
   private static final Observable<Void> enableBtObs = enableBtSubject.doOnSubscribe(new Action0() {
     @Override public void call() {
       Log.i(TAG, "enableBtObs onSubscribe.");
-      boolean registered;
       try {
-        Intent i = new Intent();
-        i.setClassName("li.vin.my", "li.vin.my.EnableBluetoothActivity");
-        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        appCtxRef.get()
-            .getApplicationContext()
-            .registerReceiver(enableBtReceiver,
-                new IntentFilter("li.vin.action.BLUETOOTH_ENABLED"));
-        appCtxRef.get().getApplicationContext().startActivity(i);
-        registered = true;
+        MyVinliProxyActivity.launchEnableBtProxy(appCtxRef.get());
+        Log.i(TAG, "launchEnableBtProxy success");
       } catch (Exception e) {
-        Log.e(TAG, "registerReceiver li.vin.action.BLUETOOTH_ENABLED " + e);
-        registered = false;
-      }
-      if (registered) {
-        new Handler(Looper.getMainLooper()).postAtTime(new Runnable() {
-          @Override public void run() {
-            enableBtSubject.onNext(null);
-          }
-        }, enableBtReceiver, SystemClock.uptimeMillis() + 10000);
-      } else {
+        Log.e(TAG, "launchEnableBtProxy failed", e);
         enableBtSubject.onNext(null);
       }
     }
   }).doOnNext(new Action1<Void>() {
     @Override public void call(Void aVoid) {
       Log.i(TAG, "enableBtObs onNext.");
-      new Handler(Looper.getMainLooper()).removeCallbacksAndMessages(enableBtReceiver);
-      appCtxRef.get().unregisterReceiver(enableBtReceiver);
     }
   }).doOnUnsubscribe(new Action0() {
     @Override public void call() {
       Log.i(TAG, "enableBtObs onUnsubscribe.");
     }
-  }).publish().refCount();
+  }).share();
 
-  private static final BroadcastReceiver enableBtReceiver = new BroadcastReceiver() {
-    @Override public void onReceive(Context context, Intent intent) {
-      enableBtSubject.onNext(null);
-    }
-  };
+  /*package*/
+  static void deliverEnableBt() {
+    Log.i(TAG, "deliverEnableBt");
+    enableBtSubject.onNext(null);
+  }
 
   private static final AtomicReference<String> clientIdRef = new AtomicReference<>();
   private static final AtomicReference<String> redirectUriRef = new AtomicReference<>();
@@ -381,52 +368,41 @@ public final class VinliDevices {
         @Override public void call() {
           Log.i(TAG, "reqChipIdObs onSubscribe.");
           try {
-            Intent i = new Intent();
-            i.setClassName("li.vin.my", "li.vin.my.OAuthActivity");
-            i.putExtra("li.vin.my.client_id", clientIdRef.get());
-            i.putExtra("li.vin.my.redirect_uri", redirectUriRef.get());
-            i.putExtra("li.vin.my.choose_device", true);
-            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            appCtxRef.get()
-                .getApplicationContext()
-                .registerReceiver(reqChipIdReceiver,
-                    new IntentFilter("li.vin.action.DEVICE_CHOSEN"));
-            appCtxRef.get().getApplicationContext().startActivity(i);
+            MyVinliProxyActivity.launchChipIdProxy(appCtxRef.get(), clientIdRef.get(),
+                redirectUriRef.get());
+            Log.i(TAG, "launchChipIdProxy success");
           } catch (Exception e) {
-            Log.e(TAG, "registerReceiver li.vin.action.BLUETOOTH_ENABLED " + e);
+            Log.e(TAG, "launchChipIdProxy failed", e);
             reqChipIdSubject.onNext(null);
           }
         }
       }).doOnNext(new Action1<Void>() {
         @Override public void call(Void aVoid) {
-          Log.i(TAG, "reqChipIdObs onNext - unregging receiver.");
-          appCtxRef.get().unregisterReceiver(reqChipIdReceiver);
+          Log.i(TAG, "reqChipIdObs onNext.");
         }
       }).doOnUnsubscribe(new Action0() {
         @Override public void call() {
           Log.i(TAG, "reqChipIdObs onUnsubscribe.");
         }
-      }).publish().refCount();
+      }).share();
 
-  private static final BroadcastReceiver reqChipIdReceiver = new BroadcastReceiver() {
-    @Override public void onReceive(Context context, Intent intent) {
-      String chipId = intent == null ? null : intent.getStringExtra("li.vin.my.chip_id");
-      String devName = intent == null ? null : intent.getStringExtra("li.vin.my.device_name");
-      String devIcon = intent == null ? null : intent.getStringExtra("li.vin.my.device_icon");
-      String devId = intent == null ? null : intent.getStringExtra("li.vin.my.device_id");
-      if (chipId != null && getTrimmedLength(chipId) != 0) {
-        context.getApplicationContext()
-            .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(CHIP_ID_KEY, chipId)
-            .putString(DEV_NAME_KEY, devName)
-            .putString(DEV_IC_KEY, devIcon)
-            .putString(DEV_ID_KEY, devId)
-            .apply();
-      }
-      reqChipIdSubject.onNext(null);
+  /*package*/
+  static void deliverChipId(@NonNull Context context, String chipId, String devName, String devIcon,
+      String devId) {
+    Log.i(TAG, "deliverChipId");
+    if (chipId != null && getTrimmedLength(chipId) != 0 &&
+        devId != null && getTrimmedLength(devId) != 0) {
+      context.getApplicationContext()
+          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
+          .edit()
+          .putString(CHIP_ID_KEY, chipId)
+          .putString(DEV_NAME_KEY, devName)
+          .putString(DEV_IC_KEY, devIcon)
+          .putString(DEV_ID_KEY, devId)
+          .apply();
     }
-  };
+    reqChipIdSubject.onNext(null);
+  }
 
   private VinliDevices() {
   }

@@ -2,8 +2,6 @@ package li.vin.my.deviceservice;
 
 import android.support.annotation.NonNull;
 import java.util.UUID;
-import rx.Observable;
-import rx.functions.Func1;
 
 /*package*/ class ParamString extends ParamPlain<String> {
   public ParamString(UUID uuid) {
@@ -14,7 +12,7 @@ import rx.functions.Func1;
     super(uuid, hasNotifications, shouldRead);
   }
 
-  @Override Func1<IDevServ, Observable<String>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+  @Override DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
     return new DeviceServiceFuncString(chipId, name);
   }
 

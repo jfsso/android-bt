@@ -46,11 +46,6 @@ import java.util.UUID;
   public static final UUID STREAM = UUID.fromString("180c5783-aa91-43c0-a8f3-d12a7668b339");
 
   /**
-   * Attribute to write the secret to begin streaming data
-   */
-  public static final UUID UNLOCK = UUID.fromString("60f38902-b638-4aaa-b7eb-218769047cd8");
-
-  /**
    * Engine Revolutions Per Minute<br>
    * format: 401C{data}
    */
@@ -62,17 +57,7 @@ import java.util.UUID;
    */
   public static final UUID ACCEL = UUID.fromString("51c5848d-40ec-4d0c-918c-628db566432c");
 
-  /**
-   * Accelerometer Interrupt Input
-   * format: "Crash Detected" <—Subject to change.
-   */
-  public static final UUID CRASH = UUID.fromString("5d053d4d-0420-4e44-b386-c97d3cab5845");
-
-  /**
-   * Car's power status.<br>
-   * format: 0 or 1
-   */
-  public static final UUID POWER_STATUS = UUID.fromString("8b56f17c-43e6-47b8-8e0e-010c57bafc4a");
+  public static final UUID BATTERY_VOLTAGE = UUID.fromString("2db17ea0-78ab-420b-8449-f791c5e8c82b");
 
   private Uuids() {
   }

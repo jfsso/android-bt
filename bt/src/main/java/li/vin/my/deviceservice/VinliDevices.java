@@ -1,5 +1,6 @@
 package li.vin.my.deviceservice;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
@@ -11,6 +12,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
 import android.widget.Toast;
 import java.lang.ref.WeakReference;
@@ -107,6 +109,9 @@ public final class VinliDevices {
           .apply();
     }
 
+    if (context instanceof Activity) {
+      setActivityRef((Activity) context);
+    }
     final WeakReference<Context> ctx = new WeakReference<>(context);
 
     return enableBt(context).flatMap(new Func1<Void, Observable<DeviceConnection>>() {
@@ -134,7 +139,6 @@ public final class VinliDevices {
               return;
             }
 
-            appCtxRef.set(context.getApplicationContext());
             clientIdRef.compareAndSet(null, clientId);
             redirectUriRef.compareAndSet(null, redirectUri);
 
@@ -147,8 +151,8 @@ public final class VinliDevices {
                   return;
                 }
 
-                SharedPreferences prefs =
-                    appCtxRef.get().getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
+                SharedPreferences prefs = context.getApplicationContext()
+                    .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
                 String chipId = prefs.getString(CHIP_ID_KEY, null);
                 String devName = prefs.getString(DEV_NAME_KEY, null);
                 String devIcon = prefs.getString(DEV_IC_KEY, null);
@@ -281,6 +285,9 @@ public final class VinliDevices {
   }
 
   private static Observable<Void> enableBt(@NonNull Context context) {
+    if (context instanceof Activity) {
+      setActivityRef((Activity) context);
+    }
     final WeakReference<Context> ctx = new WeakReference<>(context);
     return Observable.create(new Observable.OnSubscribe<Void>() {
       @Override public void call(final Subscriber<? super Void> subscriber) {
@@ -297,12 +304,16 @@ public final class VinliDevices {
           return;
         }
 
-        appCtxRef.set(context.getApplicationContext());
-
         final Runnable deliverResult = new Runnable() {
           @Override public void run() {
             if (subscriber.isUnsubscribed()) return;
-            if (isBluetoothEnabled(appCtxRef.get())) {
+            Context context = ctx.get();
+            if (context == null) {
+              subscriber.onError(new Exception("Context ref went null."));
+              return;
+            }
+
+            if (isBluetoothEnabled(context)) {
               subscriber.onNext(null);
               subscriber.onCompleted();
             } else {
@@ -331,13 +342,38 @@ public final class VinliDevices {
     });
   }
 
-  private static final AtomicReference<Context> appCtxRef = new AtomicReference<>();
+  private static WeakReference<Activity> activityRef = new WeakReference<>(null);
+  private static final Object activityRefLock = new Object();
+
+  private static @Nullable Activity getActivityRef() {
+    if (activityRef == null || activityRef.get() == null) return null;
+    synchronized (activityRefLock) {
+      return activityRef == null ? null : activityRef.get();
+    }
+  }
+
+  private static void setActivityRef(@NonNull Activity activity) {
+    // Every time a new Activity ref is set, force kill any pending operations.
+    killAllPendingOperations();
+    synchronized (activityRefLock) {
+      activityRef = new WeakReference<>(activity);
+    }
+  }
+
+  private static void killAllPendingOperations() {
+    MyVinliProxyActivity.killAll();
+    enableBtSubject.onNext(null);
+    reqChipIdSubject.onNext(null);
+  }
+
   private static final PublishSubject<Void> enableBtSubject = PublishSubject.create();
   private static final Observable<Void> enableBtObs = enableBtSubject.doOnSubscribe(new Action0() {
     @Override public void call() {
       Log.i(TAG, "enableBtObs onSubscribe.");
       try {
-        MyVinliProxyActivity.launchEnableBtProxy(appCtxRef.get());
+        Activity activity = getActivityRef();
+        if (activity == null) throw new Exception("cannot launch UI without Activity.");
+        MyVinliProxyActivity.launchEnableBtProxy(activity);
         Log.i(TAG, "launchEnableBtProxy success");
       } catch (Exception e) {
         Log.e(TAG, "launchEnableBtProxy failed", e);
@@ -368,7 +404,9 @@ public final class VinliDevices {
         @Override public void call() {
           Log.i(TAG, "reqChipIdObs onSubscribe.");
           try {
-            MyVinliProxyActivity.launchChipIdProxy(appCtxRef.get(), clientIdRef.get(),
+            Activity activity = getActivityRef();
+            if (activity == null) throw new Exception("cannot launch UI without Activity.");
+            MyVinliProxyActivity.launchChipIdProxy(activity, clientIdRef.get(),
                 redirectUriRef.get());
             Log.i(TAG, "launchChipIdProxy success");
           } catch (Exception e) {

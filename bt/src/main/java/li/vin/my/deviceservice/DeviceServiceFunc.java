@@ -59,7 +59,7 @@ import static android.text.TextUtils.getTrimmedLength;
           synchronized (DeviceServiceFunc.this) {
             opUuid = initOp(iVinliService, subscriber);
             if (opUuid == null || getTrimmedLength(opUuid) == 0) {
-              throw new NullPointerException("empty UUID returned by observeBool.");
+              throw new NullPointerException("empty UUID returned by initOp " + TAG());
             }
             if (cancelations != null) cancelations.create(subscriber);
           }

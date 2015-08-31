@@ -28,33 +28,80 @@ import java.util.UUID;
     if (val == null) {
       throw new RuntimeException("val == null");
     }
+    if (val.length == 0) {
+      throw new RuntimeException("val empty.");
+    }
 
-    Log.d("parseCharacteristic", new String(val, 0, val.length, ASCII));
+    Log.d("parseCharacteristic ("+characteristic.getUuid()+")", bytesToHex(val) + " : " + new String(val, 0, val.length, ASCII));//new String(val, 0, val.length, ASCII));
 
-    int valStart = 2;
-    if (val[0] != '4' || val[1] != '1') {
-      if (val[0] == '\n' && val[1] == '4' && val[2] == '1') {
-        Log.d("ParamStream", "first char was newline");
-        valStart += 1;
+    // trim empties from start
+    int stt = 0;
+    while (stt < val.length && (Character.isWhitespace(val[stt]) || val[stt] == 0)) {
+      stt++;
+    }
+
+    // trim empties from end
+    int end = val.length-1;
+    while (end >= 0 && (Character.isWhitespace(val[end]) || val[end] == 0)) {
+      end--;
+    }
+    end++;
+
+    // validate there's still a nonempty value
+    int len = end - stt;
+    if (len < 2) {
+      throw new RuntimeException("trimmed len < 2.");
+    }
+
+    if (val[stt] == '4' && val[stt+1] == '1') {
+      if (end > stt+2) {
+        return new String(val, stt + 2, end - (stt + 2), ASCII);
       } else {
-        throw new RuntimeException("streaming characteristic did not start with 41. Was instead: " + new String(val, 0, val.length, ASCII));
+        throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
       }
-    }
-
-    int valLen = 0;
-    for (int i = valStart; i < val.length; i++) {
-      final byte c = val[i];
-      if (c == '\r' || c == 0) {
-        break;
+    } else if (val[stt] == 'B' && val[stt+1] == ':') {
+      if (end > stt+2) {
+        return "B:" + new String(val, stt + 2, end - (stt + 2), ASCII);
+      } else {
+        throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
       }
-      ++valLen;
+    } else if (val[stt] == 'P' && val[stt+1] == '0') {
+      return "P0";
+    } else if (val[stt] == 'P' && val[stt+1] == '1') {
+      return "P1";
+    } else {
+      throw new RuntimeException("unknown streaming characteristic("+
+          new String(val, stt, end - stt, ASCII)+") " +
+          characteristic.getUuid());
     }
 
-    if (valLen == 0) {
-      throw new RuntimeException("valLen == 0");
-    }
-
-    return new String(val, valStart, valLen, ASCII);
+    //int valStart = 2;
+    //
+    //if (val[0] != '4' || val[1] != '1') {
+    //  if (val[0] == '\n' && val[1] == '4' && val[2] == '1') {
+    //    Log.d("ParamStream", "first char was newline");
+    //    valStart += 1;
+    //  } else if (val[0] == 'P' && (val[1] == '0' || val[1] == '1')) {
+    //    return val[1] == '0' ? "P0" : "P1";
+    //  } else {
+    //    throw new RuntimeException("streaming characteristic did not start with 41. Was instead: " + new String(val, 0, val.length, ASCII));
+    //  }
+    //}
+    //
+    //int valLen = 0;
+    //for (int i = valStart; i < val.length; i++) {
+    //  final byte c = val[i];
+    //  if (c == '\r' || c == 0) {
+    //    break;
+    //  }
+    //  ++valLen;
+    //}
+    //
+    //if (valLen == 0) {
+    //  throw new RuntimeException("valLen == 0");
+    //}
+    //
+    //return new String(val, valStart, valLen, ASCII);
   }
 
   @Override public Boolean matches(final String val) {
@@ -64,5 +111,16 @@ import java.util.UUID;
 
   @Override public @Nullable String getCode() {
     return mCode;
+  }
+
+  final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+  public static String bytesToHex(byte[] bytes) {
+    char[] hexChars = new char[bytes.length * 2];
+    for ( int j = 0; j < bytes.length; j++ ) {
+      int v = bytes[j] & 0xFF;
+      hexChars[j * 2] = hexArray[v >>> 4];
+      hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+    }
+    return new String(hexChars);
   }
 }

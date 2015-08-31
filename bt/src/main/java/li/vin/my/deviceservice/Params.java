@@ -6,23 +6,25 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class Params {
+
   public static final Param<Float> ACCEL_X = new ParamAccelFloat() {
     @Override public Float parseVal(byte[] val) {
-      return val[0] * ACCEL_CONVERT;
+      return accelConvert(val, 0);
     }
   };
 
   public static final Param<Float> ACCEL_Y = new ParamAccelFloat() {
     @Override public Float parseVal(byte[] val) {
-      return val[1] * ACCEL_CONVERT;
+      return accelConvert(val, 1);
     }
   };
 
   public static final Param<Float> ACCEL_Z = new ParamAccelFloat() {
     @Override public Float parseVal(byte[] val) {
-      return val[2] * ACCEL_CONVERT;
+      return accelConvert(val, 2);
     }
   };
 
@@ -42,7 +44,7 @@ public final class Params {
 
   public static final Param<Boolean> COLLISION = new ParamAccelBool() {
     @Override public Boolean parseVal(byte[] val) {
-      return val[3] == 1 ? Boolean.TRUE : Boolean.FALSE;
+      return new String(val, val.length-1, 1, ASCII).equals("1") ? Boolean.TRUE : Boolean.FALSE;
     }
   };
 
@@ -262,7 +264,7 @@ public final class Params {
 
   public static final Param<String> PIDS = new ParamString(Uuids.PIDS, false, true);
 
-  public static final ParamStream<Boolean> POWER_STATUS_NOTIFY = new ParamStream<Boolean>("P") {
+  public static final ParamStream<Boolean> POWER_STATUS = new ParamStream<Boolean>("P") {
     @Override Boolean parseVal(String val) {
       return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
     }
@@ -272,18 +274,33 @@ public final class Params {
     }
   };
 
-  public static final Param<Boolean> POWER_STATUS_READ = new ParamPlain<Boolean>(Uuids.POWER_STATUS, false, true) {
-    @Override Boolean parseVal(String val) {
-      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+  public static final ParamPlain<String> BATTERY_VOLTAGE = new ParamPlain<String>(Uuids.BATTERY_VOLTAGE, false, true) {
+    @Override String parseVal(String val) {
+      return val;
     }
 
-    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
-      return new DeviceServiceFuncBool(chipId, name);
+    @Override DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
     }
   };
 
-  /*package*/ @SuppressWarnings("unchecked") static final <T> ParamImpl<T, ?> paramFor(@NonNull String name) throws RuntimeException {
+  private static final ConcurrentHashMap<String,PIDParam> pidParams =
+      new ConcurrentHashMap<>();
+  public static PIDParam getPidParam(String code) {
+    PIDParam param = pidParams.get(code);
+    if (param == null) {
+      param = new PIDParam(code);
+      PIDParam old = pidParams.putIfAbsent(code, param);
+      param = old != null ? old : param;
+    }
+    return param;
+  }
+
+  /*package*/ @SuppressWarnings("unchecked") static <T> ParamImpl<T, ?> paramFor(@NonNull String name) throws RuntimeException {
     try {
+      if (name.startsWith("PIDParam")) {
+        return (ParamImpl<T, ?>) getPidParam(name.substring("PIDParam".length()));
+      }
       return (ParamImpl<T, ?>) Params.class.getField(name).get(null);
     } catch (IllegalAccessException | NoSuchFieldException e) {
       throw new RuntimeException("failed to find Param " + name, e);
@@ -291,6 +308,9 @@ public final class Params {
   }
 
   /*package*/ static String nameFor(@NonNull Param<?> p) {
+    if (p instanceof PIDParam) {
+      return "PIDParam"+p.getCode();
+    }
     try {
       for (Field f : Params.class.getFields()) {
         if (f.get(null) == p) {

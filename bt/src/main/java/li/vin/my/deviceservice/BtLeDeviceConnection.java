@@ -90,6 +90,7 @@ import rx.functions.Func2;
   @NonNull @Override public Observable<SupportedPids> supportedPids() {
     return observe(Params.PIDS).map(new Func1<String, SupportedPids>() {
       @Override public SupportedPids call(String rawPids) {
+        Log.i(TAG, "got raw supported pids '" + rawPids + "'");
         return new SupportedPids(rawPids);
       }
     });

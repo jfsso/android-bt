@@ -21,8 +21,8 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 import rx.Observable;
 import rx.Subscriber;
-import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.internal.operators.OperatorReplayFix;
 import rx.subjects.BehaviorSubject;
 import rx.subjects.PublishSubject;
 
@@ -113,9 +113,10 @@ public final class VinliDevices {
     ConnectAttempt connectAttempt = new ConnectAttempt.Builder().context(context)
         .clientId(clientId)
         .redirectUri(redirectUri)
-        .build()
-        .fromCache();
-    connectAttempt = forceFreshDevice ? connectAttempt.clearCache() : connectAttempt.fromCache();
+        .build();
+    if (forceFreshDevice) {
+      connectAttempt.clearCache();
+    }
     btResult.onNext(connectAttempt);
     connectResult.onNext(connectAttempt);
     mainInit.onNext(connectAttempt);
@@ -160,6 +161,11 @@ public final class VinliDevices {
   private static final Func1<ConnectAttempt, Observable<ConnectAttempt>> mainBt =
       new Func1<ConnectAttempt, Observable<ConnectAttempt>>() {
         @Override public Observable<ConnectAttempt> call(final ConnectAttempt connAttempt) {
+
+          Context context = connAttempt.context();
+          if (context == null) return Observable.error(new RuntimeException("no context."));
+          if (isBluetoothEnabled(context)) return Observable.just(connAttempt);
+
           return Observable.create(new Observable.OnSubscribe<ConnectAttempt>() {
             @Override public void call(final Subscriber<? super ConnectAttempt> subscriber) {
 
@@ -180,17 +186,24 @@ public final class VinliDevices {
                 }
               };
 
-              final Action1<ConnectAttempt> done = new Action1<ConnectAttempt>() {
-                @Override public void call(ConnectAttempt connAttempt) {
+              btResult.subscribe(new Subscriber<ConnectAttempt>() {
+                @Override public void onCompleted() {
+                  if (!isUnsubscribed()) unsubscribe();
+                }
+
+                @Override public void onError(Throwable e) {
+                  if (!isUnsubscribed()) unsubscribe();
+                }
+
+                @Override public void onNext(ConnectAttempt connectAttempt) {
+                  if (!isUnsubscribed()) unsubscribe();
                   try {
                     appContext.unregisterReceiver(recv);
                   } catch (Exception ignored) {
                   }
-                  checkBtAttempt(connAttempt, subscriber, true);
+                  checkBtAttempt(connectAttempt, subscriber, true);
                 }
-              };
-
-              subscriber.add(btResult.take(1).subscribe(done));
+              });
 
               try {
                 appContext.registerReceiver(recv,
@@ -205,13 +218,24 @@ public final class VinliDevices {
                 btResult.onNext(connAttempt);
               }
             }
-          }).timeout(10, TimeUnit.SECONDS);
+          }).delaySubscription(100, TimeUnit.MILLISECONDS);
         }
       };
 
   private static final Func1<ConnectAttempt, Observable<DeviceConnection>> mainConnect =
       new Func1<ConnectAttempt, Observable<DeviceConnection>>() {
-        @Override public Observable<DeviceConnection> call(final ConnectAttempt connAttempt) {
+        @Override public Observable<DeviceConnection> call(final ConnectAttempt ca) {
+
+          Context context = ca.context();
+          if (context == null) return Observable.error(new RuntimeException("no context."));
+          final ConnectAttempt connAttempt = ca.fromCache();
+          if (connAttempt.chipId != null && getTrimmedLength(connAttempt.chipId) != 0 &&
+              connAttempt.devId != null && getTrimmedLength(connAttempt.devId) != 0) {
+            return Observable.just(
+                (DeviceConnection) makeOrUpdateConnection(context, connAttempt.chipId,
+                    connAttempt.devName, connAttempt.devIcon, connAttempt.devId));
+          }
+
           return Observable.create(new Observable.OnSubscribe<DeviceConnection>() {
             @Override public void call(final Subscriber<? super DeviceConnection> subscriber) {
 
@@ -237,17 +261,24 @@ public final class VinliDevices {
                 }
               };
 
-              final Action1<ConnectAttempt> done = new Action1<ConnectAttempt>() {
-                @Override public void call(ConnectAttempt connAttempt) {
+              connectResult.subscribe(new Subscriber<ConnectAttempt>() {
+                @Override public void onCompleted() {
+                  if (!isUnsubscribed()) unsubscribe();
+                }
+
+                @Override public void onError(Throwable e) {
+                  if (!isUnsubscribed()) unsubscribe();
+                }
+
+                @Override public void onNext(ConnectAttempt connectAttempt) {
+                  if (!isUnsubscribed()) unsubscribe();
                   try {
                     appContext.unregisterReceiver(recv);
                   } catch (Exception ignored) {
                   }
-                  checkConnectAttempt(connAttempt, subscriber, true);
+                  checkConnectAttempt(connectAttempt, subscriber, true);
                 }
-              };
-
-              subscriber.add(connectResult.take(1).subscribe(done));
+              });
 
               try {
                 appContext.registerReceiver(recv, new IntentFilter("li.vin.action.DEVICE_CHOSEN"));
@@ -263,12 +294,17 @@ public final class VinliDevices {
                 connectResult.onNext(connAttempt);
               }
             }
-          });
+          }).delaySubscription(100, TimeUnit.MILLISECONDS);
         }
       };
 
-  private static final Observable<DeviceConnection> mainBtAndConnect =
-      mainInit.flatMap(mainBt).flatMap(mainConnect).single().share();
+  private static final Observable<DeviceConnection> mainBtAndConnect;
+
+  static {
+    mainBtAndConnect = OperatorReplayFix.create(mainInit.flatMap(mainBt).flatMap(mainConnect), 1)
+        .refCount()
+        .take(1);
+  }
 
   /**
    * Check whether or not My Vinli is currently installed. If this returns false, My Vinli

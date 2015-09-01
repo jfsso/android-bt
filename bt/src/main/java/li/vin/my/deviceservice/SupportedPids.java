@@ -101,6 +101,10 @@ public final class SupportedPids {
     this.raw = raw;
   }
 
+  public String getRaw() {
+    return raw;
+  }
+
   public <T extends Param<?>> boolean supports(@NonNull T param) throws InvalidParamException {
     String code = param.getCode();
     if (code == null) throw new InvalidParamException("Must provide Param with nonnull code.");

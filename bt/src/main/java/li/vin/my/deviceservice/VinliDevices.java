@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -16,12 +18,12 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.widget.Toast;
 import java.lang.ref.WeakReference;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
 import rx.Observable;
 import rx.Subscriber;
-import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.subjects.BehaviorSubject;
 import rx.subjects.PublishSubject;
 
 import static android.text.TextUtils.getTrimmedLength;
@@ -55,10 +57,13 @@ public final class VinliDevices {
     return result;
   }
 
-  /** Determine whether or not the given {@link Intent} is relevant to the current application.
-   * If this returns false, the data is invalid or possibly related to an unknown or unrelated
-   * Vinli device, and should be ignored. */
-  public static boolean intentIsRelevant(@NonNull Context context, Intent intent) {
+  /**
+   * Determine whether or not the given {@link Intent} is related to Vinli and relevant to the
+   * current application. If this returns false, the data is invalid or possibly related to an
+   * unknown or unrelated Vinli device, and should be ignored.
+   */
+  @SuppressWarnings("unused") public static boolean intentIsRelevant(@NonNull Context context,
+      Intent intent) {
     if (intent == null) return false;
     String intentTarget = intent.getStringExtra("li.vin.my.chip_id");
     return intentTarget != null && intentTarget.equals(context.getApplicationContext()
@@ -67,12 +72,13 @@ public final class VinliDevices {
   }
 
   /**
-   * Convenience to connect to the last known cached device, not forcing a fresh device scan.
+   * Convenience to connect to the last known cached device, not forcing a fresh device scan. This
+   * should almost always be used unless the user explicitly requests a fresh device choice.
    *
    * @see #connect(Context, String, String, boolean)
    */
-  public static @NonNull Observable<DeviceConnection> connect(@NonNull Context context,
-      @NonNull final String clientId, @NonNull final String redirectUri) {
+  @SuppressWarnings("unused") public static @NonNull Observable<DeviceConnection> connect(
+      @NonNull Context context, @NonNull final String clientId, @NonNull final String redirectUri) {
     return connect(context, clientId, redirectUri, false);
   }
 
@@ -81,115 +87,188 @@ public final class VinliDevices {
    * to any My Vinli device capabilities exposed by the {@link DeviceConnection} interface.
    * It is important to note that this Observable will immediately emit an error if the My Vinli
    * app is not installed, so it is advisable to use {@link #isMyVinliInstalledAndUpdated(Context)}
-   * and
-   * {@link #launchMarketToMyVinli(Context)} to handle this scenario in advance.
+   * and {@link #launchMarketToMyVinli(Context)} to handle this scenario in advance.
+   *
+   * <br><br>
+   *
+   * Note that if this is the first time a connection is being established and no cached connection
+   * is available, this will fail if not called from an Activity context since UI presentation is
+   * required. Also, each call to connect will abort any previous pending connects, so connect
+   * should only be called once per Component lifecycle sequence, and the resulting observable
+   * reused.
    *
    * @param clientId OAuth Client ID of the application requesting a connection.
    * @param redirectUri OAuth redirect URI of the application requesting a connection.
-   * @param forceFreshChoice Forces My Vinli to initiate a Bluetooth scan of nearby devices and
+   * @param forceFreshDevice Forces My Vinli to initiate a Bluetooth scan of nearby devices and
    * make a fresh choice rather than automatically connecting to the last known device. It may be
    * helpful to set this to true in response to a user action explicitly requesting a fresh choice.
    */
   public static @NonNull Observable<DeviceConnection> connect(@NonNull final Context context,
-      @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshChoice) {
+      @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshDevice) {
     if (!isMyVinliInstalledAndUpdated(context)) {
       return Observable.error(new Exception(
           "My Vinli is not installed - use isMyVinliInstalledAndUpdated "
               + "and launchMarketToMyVinli to handle this error."));
     }
-
-    if (forceFreshChoice) {
-      context.getApplicationContext()
-          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-          .edit()
-          .putString(CHIP_ID_KEY, null)
-          .putString(DEV_NAME_KEY, null)
-          .putString(DEV_IC_KEY, null)
-          .putString(DEV_ID_KEY, null)
-          .apply();
-    }
-
-    if (context instanceof Activity) {
-      setActivityRef((Activity) context);
-    }
-    final WeakReference<Context> ctx = new WeakReference<>(context);
-
-    return enableBt(context).flatMap(new Func1<Void, Observable<DeviceConnection>>() {
-      @Override public Observable<DeviceConnection> call(Void aVoid) {
-        return Observable.create(new Observable.OnSubscribe<DeviceConnection>() {
-          @Override public void call(final Subscriber<? super DeviceConnection> subscriber) {
-            if (subscriber.isUnsubscribed()) return;
-            Context context = ctx.get();
-            if (context == null) {
-              subscriber.onError(new Exception("Context ref went null."));
-              return;
-            }
-
-            SharedPreferences prefs = context.getApplicationContext()
-                .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
-            String chipId = prefs.getString(CHIP_ID_KEY, null);
-            String devName = prefs.getString(DEV_NAME_KEY, null);
-            String devIcon = prefs.getString(DEV_IC_KEY, null);
-            String devId = prefs.getString(DEV_ID_KEY, null);
-
-            if (chipId != null && getTrimmedLength(chipId) != 0 &&
-                devId != null && getTrimmedLength(devId) != 0) {
-              subscriber.onNext(makeOrUpdateConnection(context, chipId, devName, devIcon, devId));
-              subscriber.onCompleted();
-              return;
-            }
-
-            clientIdRef.compareAndSet(null, clientId);
-            redirectUriRef.compareAndSet(null, redirectUri);
-
-            final Runnable deviceChosen = new Runnable() {
-              @Override public void run() {
-                if (subscriber.isUnsubscribed()) return;
-                Context context = ctx.get();
-                if (context == null) {
-                  subscriber.onError(new Exception("Context ref went null."));
-                  return;
-                }
-
-                SharedPreferences prefs = context.getApplicationContext()
-                    .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
-                String chipId = prefs.getString(CHIP_ID_KEY, null);
-                String devName = prefs.getString(DEV_NAME_KEY, null);
-                String devIcon = prefs.getString(DEV_IC_KEY, null);
-                String devId = prefs.getString(DEV_ID_KEY, null);
-
-                if (chipId != null && getTrimmedLength(chipId) != 0 &&
-                    devId != null && getTrimmedLength(devId) != 0) {
-                  subscriber.onNext(
-                      makeOrUpdateConnection(context, chipId, devName, devIcon, devId));
-                  subscriber.onCompleted();
-                } else {
-                  subscriber.onError(new RuntimeException("device not chosen."));
-                }
-              }
-            };
-
-            reqChipIdObs.subscribe(new Subscriber<Void>() {
-              @Override public void onCompleted() {
-                if (!isUnsubscribed()) unsubscribe();
-                deviceChosen.run();
-              }
-
-              @Override public void onError(Throwable e) {
-                if (!isUnsubscribed()) unsubscribe();
-                deviceChosen.run();
-              }
-
-              @Override public void onNext(Void aVoid) {
-                if (!isUnsubscribed()) unsubscribe();
-                deviceChosen.run();
-              }
-            });
-          }
-        });
-      }
-    });
+    ConnectAttempt connectAttempt = new ConnectAttempt.Builder().context(context)
+        .clientId(clientId)
+        .redirectUri(redirectUri)
+        .build()
+        .fromCache();
+    connectAttempt = forceFreshDevice ? connectAttempt.clearCache() : connectAttempt.fromCache();
+    btResult.onNext(connectAttempt);
+    connectResult.onNext(connectAttempt);
+    mainInit.onNext(connectAttempt);
+    return mainBtAndConnect;
   }
+
+  private static final BehaviorSubject<ConnectAttempt> mainInit = BehaviorSubject.create();
+  private static final PublishSubject<ConnectAttempt> btResult = PublishSubject.create();
+  private static final PublishSubject<ConnectAttempt> connectResult = PublishSubject.create();
+
+  private static boolean checkBtAttempt(ConnectAttempt connAttempt,
+      Subscriber<? super ConnectAttempt> subscriber, boolean errorIfNone) {
+    if (subscriber.isUnsubscribed()) return true;
+    Context context = connAttempt.context();
+    if (context != null && isBluetoothEnabled(context)) {
+      subscriber.onNext(connAttempt);
+      subscriber.onCompleted();
+      return true;
+    } else if (errorIfNone) {
+      subscriber.onError(new RuntimeException("enable bt failed."));
+    }
+    return false;
+  }
+
+  private static boolean checkConnectAttempt(ConnectAttempt connAttempt,
+      Subscriber<? super DeviceConnection> subscriber, boolean errorIfNone) {
+    if (subscriber.isUnsubscribed()) return true;
+    Context context = connAttempt.context();
+    if (context != null &&
+        connAttempt.chipId != null && getTrimmedLength(connAttempt.chipId) != 0 &&
+        connAttempt.devId != null && getTrimmedLength(connAttempt.devId) != 0) {
+      subscriber.onNext(makeOrUpdateConnection(context, connAttempt.chipId, connAttempt.devName,
+          connAttempt.devIcon, connAttempt.devId));
+      subscriber.onCompleted();
+      return true;
+    } else if (errorIfNone) {
+      subscriber.onError(new RuntimeException("connection failed."));
+    }
+    return false;
+  }
+
+  private static final Func1<ConnectAttempt, Observable<ConnectAttempt>> mainBt =
+      new Func1<ConnectAttempt, Observable<ConnectAttempt>>() {
+        @Override public Observable<ConnectAttempt> call(final ConnectAttempt connAttempt) {
+          return Observable.create(new Observable.OnSubscribe<ConnectAttempt>() {
+            @Override public void call(final Subscriber<? super ConnectAttempt> subscriber) {
+
+              if (checkBtAttempt(connAttempt, subscriber, false)) {
+                return;
+              }
+
+              Context ctx = connAttempt.context();
+              if (ctx == null) {
+                subscriber.onError(new RuntimeException("no context."));
+                return;
+              }
+              final Context appContext = ctx.getApplicationContext();
+
+              final BroadcastReceiver recv = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                  btResult.onNext(connAttempt);
+                }
+              };
+
+              final Action1<ConnectAttempt> done = new Action1<ConnectAttempt>() {
+                @Override public void call(ConnectAttempt connAttempt) {
+                  try {
+                    appContext.unregisterReceiver(recv);
+                  } catch (Exception ignored) {
+                  }
+                  checkBtAttempt(connAttempt, subscriber, true);
+                }
+              };
+
+              subscriber.add(btResult.take(1).subscribe(done));
+
+              try {
+                appContext.registerReceiver(recv,
+                    new IntentFilter("li.vin.action.BLUETOOTH_ENABLED"));
+                Intent i = new Intent();
+                i.setClassName("li.vin.my", "li.vin.my.EnableBluetoothActivity");
+                i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                connAttempt.activity().startActivity(i);
+                Log.i(TAG, "startActivity EnableBluetoothActivity success");
+              } catch (Exception e) {
+                Log.i(TAG, "startActivity EnableBluetoothActivity failed", e);
+                btResult.onNext(connAttempt);
+              }
+            }
+          }).timeout(10, TimeUnit.SECONDS);
+        }
+      };
+
+  private static final Func1<ConnectAttempt, Observable<DeviceConnection>> mainConnect =
+      new Func1<ConnectAttempt, Observable<DeviceConnection>>() {
+        @Override public Observable<DeviceConnection> call(final ConnectAttempt connAttempt) {
+          return Observable.create(new Observable.OnSubscribe<DeviceConnection>() {
+            @Override public void call(final Subscriber<? super DeviceConnection> subscriber) {
+
+              if (checkConnectAttempt(connAttempt, subscriber, false)) {
+                return;
+              }
+
+              Context ctx = connAttempt.context();
+              if (ctx == null) {
+                subscriber.onError(new RuntimeException("no context."));
+                return;
+              }
+              final Context appContext = ctx.getApplicationContext();
+
+              final BroadcastReceiver recv = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                  try {
+                    connectResult.onNext(connAttempt.fromIntent(intent).toCache());
+                  } catch (Exception e) {
+                    Log.e(TAG, "connectResult onReceive error", e);
+                    connectResult.onNext(connAttempt);
+                  }
+                }
+              };
+
+              final Action1<ConnectAttempt> done = new Action1<ConnectAttempt>() {
+                @Override public void call(ConnectAttempt connAttempt) {
+                  try {
+                    appContext.unregisterReceiver(recv);
+                  } catch (Exception ignored) {
+                  }
+                  checkConnectAttempt(connAttempt, subscriber, true);
+                }
+              };
+
+              subscriber.add(connectResult.take(1).subscribe(done));
+
+              try {
+                appContext.registerReceiver(recv, new IntentFilter("li.vin.action.DEVICE_CHOSEN"));
+                Intent i = new Intent();
+                connAttempt.toIntent(i);
+                i.putExtra("li.vin.my.choose_device", true);
+                i.setClassName("li.vin.my", "li.vin.my.OAuthActivity");
+                i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                connAttempt.activity().startActivity(i);
+                Log.i(TAG, "startActivity OAuthActivity success");
+              } catch (Exception e) {
+                Log.i(TAG, "startActivity OAuthActivity failed", e);
+                connectResult.onNext(connAttempt);
+              }
+            }
+          });
+        }
+      };
+
+  private static final Observable<DeviceConnection> mainBtAndConnect =
+      mainInit.flatMap(mainBt).flatMap(mainConnect).single().share();
 
   /**
    * Check whether or not My Vinli is currently installed. If this returns false, My Vinli
@@ -246,10 +325,11 @@ public final class VinliDevices {
 
   /**
    * Convenience for creating an {@link AlertDialog} that prompts the user to install My Vinli.
-   * it is the caller's responsibility to call {@link AlertDialog#show()} on the returned
+   * It is the caller's responsibility to call {@link AlertDialog#show()} on the returned
    * {@link AlertDialog}.
    */
-  public static @NonNull AlertDialog createMyVinliInstallRequestDialog(@NonNull Context context) {
+  @SuppressWarnings("unused") public static @NonNull AlertDialog createMyVinliInstallRequestDialog(
+      @NonNull Context context) {
     final WeakReference<Context> ctx = new WeakReference<>(context);
     return new AlertDialog.Builder(context).setTitle("Get My Vinli")
         .setMessage("My Vinli must be installed and fully updated for this app to function "
@@ -279,167 +359,164 @@ public final class VinliDevices {
       }
       return adapter.isEnabled();
     } catch (Exception e) {
-      Log.e(TAG, "isBluetoothEnabled error: " + e);
+      Log.e(TAG, "isBluetoothEnabled error", e);
       return false;
     }
   }
 
-  private static Observable<Void> enableBt(@NonNull Context context) {
-    if (context instanceof Activity) {
-      setActivityRef((Activity) context);
+  /*package*/ static class ConnectAttempt {
+    private final WeakReference<Context> contextRef;
+    /*package*/ @NonNull final String clientId;
+    /*package*/ @NonNull final String redirectUri;
+
+    /*package*/
+    @NonNull Activity activity() {
+      Context context = contextRef.get();
+      if (!(context instanceof Activity)) throw new ClassCastException("not an activity.");
+      return (Activity) context;
     }
-    final WeakReference<Context> ctx = new WeakReference<>(context);
-    return Observable.create(new Observable.OnSubscribe<Void>() {
-      @Override public void call(final Subscriber<? super Void> subscriber) {
-        if (subscriber.isUnsubscribed()) return;
-        Context context = ctx.get();
-        if (context == null) {
-          subscriber.onError(new Exception("Context ref went null."));
-          return;
-        }
 
-        if (isBluetoothEnabled(context)) {
-          subscriber.onNext(null);
-          subscriber.onCompleted();
-          return;
-        }
+    private final String chipId;
+    private final String devName;
+    private final String devIcon;
+    private final String devId;
 
-        final Runnable deliverResult = new Runnable() {
-          @Override public void run() {
-            if (subscriber.isUnsubscribed()) return;
-            Context context = ctx.get();
-            if (context == null) {
-              subscriber.onError(new Exception("Context ref went null."));
-              return;
-            }
+    /*package*/ static class Builder {
+      private WeakReference<Context> contextRef;
+      private String clientId;
+      private String redirectUri;
 
-            if (isBluetoothEnabled(context)) {
-              subscriber.onNext(null);
-              subscriber.onCompleted();
-            } else {
-              subscriber.onError(new Exception("Failed to enable Bluetooth."));
-            }
-          }
-        };
+      private String chipId;
+      private String devName;
+      private String devIcon;
+      private String devId;
 
-        enableBtObs.subscribe(new Subscriber<Void>() {
-          @Override public void onCompleted() {
-            if (!isUnsubscribed()) unsubscribe();
-            deliverResult.run();
-          }
-
-          @Override public void onError(Throwable e) {
-            if (!isUnsubscribed()) unsubscribe();
-            deliverResult.run();
-          }
-
-          @Override public void onNext(Void aVoid) {
-            if (!isUnsubscribed()) unsubscribe();
-            deliverResult.run();
-          }
-        });
+      private Builder context(Context context) {
+        contextRef = new WeakReference<>(context);
+        return this;
       }
-    });
-  }
 
-  private static WeakReference<Activity> activityRef = new WeakReference<>(null);
-  private static final Object activityRefLock = new Object();
+      private Builder clientId(String clientId) {
+        this.clientId = clientId;
+        return this;
+      }
 
-  private static @Nullable Activity getActivityRef() {
-    if (activityRef == null || activityRef.get() == null) return null;
-    synchronized (activityRefLock) {
-      return activityRef == null ? null : activityRef.get();
-    }
-  }
+      private Builder redirectUri(String redirectUri) {
+        this.redirectUri = redirectUri;
+        return this;
+      }
 
-  private static void setActivityRef(@NonNull Activity activity) {
-    // Every time a new Activity ref is set, force kill any pending operations.
-    killAllPendingOperations();
-    synchronized (activityRefLock) {
-      activityRef = new WeakReference<>(activity);
-    }
-  }
+      /*package*/ Builder chipId(String chipId) {
+        this.chipId = chipId;
+        return this;
+      }
 
-  private static void killAllPendingOperations() {
-    MyVinliProxyActivity.killAll();
-    enableBtSubject.onNext(null);
-    reqChipIdSubject.onNext(null);
-  }
+      /*package*/ Builder devName(String devName) {
+        this.devName = devName;
+        return this;
+      }
 
-  private static final PublishSubject<Void> enableBtSubject = PublishSubject.create();
-  private static final Observable<Void> enableBtObs = enableBtSubject.doOnSubscribe(new Action0() {
-    @Override public void call() {
-      Log.i(TAG, "enableBtObs onSubscribe.");
-      try {
-        Activity activity = getActivityRef();
-        if (activity == null) throw new Exception("cannot launch UI without Activity.");
-        MyVinliProxyActivity.launchEnableBtProxy(activity);
-        Log.i(TAG, "launchEnableBtProxy success");
-      } catch (Exception e) {
-        Log.e(TAG, "launchEnableBtProxy failed", e);
-        enableBtSubject.onNext(null);
+      /*package*/ Builder devIcon(String devIcon) {
+        this.devIcon = devIcon;
+        return this;
+      }
+
+      /*package*/ Builder devId(String devId) {
+        this.devId = devId;
+        return this;
+      }
+
+      /*package*/ ConnectAttempt build() {
+        Context context;
+        if (contextRef == null || (context = contextRef.get()) == null) {
+          throw new NullPointerException("need context.");
+        }
+        if (clientId == null) throw new NullPointerException("need client id.");
+        if (redirectUri == null) throw new NullPointerException("need redirect uri.");
+        return new ConnectAttempt(context, clientId, redirectUri, chipId, devName, devIcon, devId);
       }
     }
-  }).doOnNext(new Action1<Void>() {
-    @Override public void call(Void aVoid) {
-      Log.i(TAG, "enableBtObs onNext.");
+
+    private ConnectAttempt(@NonNull Context context, @NonNull String clientId,
+        @NonNull String redirectUri, String chipId, String devName, String devIcon, String devId) {
+      this.contextRef = new WeakReference<>(context);
+      this.clientId = clientId;
+      this.redirectUri = redirectUri;
+      this.chipId = chipId;
+      this.devName = devName;
+      this.devIcon = devIcon;
+      this.devId = devId;
     }
-  }).doOnUnsubscribe(new Action0() {
-    @Override public void call() {
-      Log.i(TAG, "enableBtObs onUnsubscribe.");
+
+    /*package*/ Builder builder() {
+      return new Builder().context(contextRef.get())
+          .clientId(clientId)
+          .redirectUri(redirectUri)
+          .chipId(chipId)
+          .devName(devName)
+          .devIcon(devIcon)
+          .devId(devId);
     }
-  }).share();
 
-  /*package*/
-  static void deliverEnableBt() {
-    Log.i(TAG, "deliverEnableBt");
-    enableBtSubject.onNext(null);
-  }
+    private @Nullable Context context() {
+      return contextRef.get();
+    }
 
-  private static final AtomicReference<String> clientIdRef = new AtomicReference<>();
-  private static final AtomicReference<String> redirectUriRef = new AtomicReference<>();
-  private static final PublishSubject<Void> reqChipIdSubject = PublishSubject.create();
-  private static final Observable<Void> reqChipIdObs =
-      reqChipIdSubject.doOnSubscribe(new Action0() {
-        @Override public void call() {
-          Log.i(TAG, "reqChipIdObs onSubscribe.");
-          try {
-            Activity activity = getActivityRef();
-            if (activity == null) throw new Exception("cannot launch UI without Activity.");
-            MyVinliProxyActivity.launchChipIdProxy(activity, clientIdRef.get(),
-                redirectUriRef.get());
-            Log.i(TAG, "launchChipIdProxy success");
-          } catch (Exception e) {
-            Log.e(TAG, "launchChipIdProxy failed", e);
-            reqChipIdSubject.onNext(null);
-          }
-        }
-      }).doOnNext(new Action1<Void>() {
-        @Override public void call(Void aVoid) {
-          Log.i(TAG, "reqChipIdObs onNext.");
-        }
-      }).doOnUnsubscribe(new Action0() {
-        @Override public void call() {
-          Log.i(TAG, "reqChipIdObs onUnsubscribe.");
-        }
-      }).share();
+    private ConnectAttempt toIntent(@NonNull Intent i) {
+      i.putExtra("li.vin.my.client_id", clientId);
+      i.putExtra("li.vin.my.redirect_uri", redirectUri);
+      return this;
+    }
 
-  /*package*/
-  static void deliverChipId(@NonNull Context context, String chipId, String devName, String devIcon,
-      String devId) {
-    Log.i(TAG, "deliverChipId");
-    if (chipId != null && getTrimmedLength(chipId) != 0 &&
-        devId != null && getTrimmedLength(devId) != 0) {
+    private ConnectAttempt fromIntent(Intent i) {
+      Context context = context();
+      if (context == null) throw new NullPointerException("no context.");
+      String chipId = i == null ? null : i.getStringExtra("li.vin.my.chip_id");
+      String devName = i == null ? null : i.getStringExtra("li.vin.my.device_name");
+      String devIcon = i == null ? null : i.getStringExtra("li.vin.my.device_icon");
+      String devId = i == null ? null : i.getStringExtra("li.vin.my.device_id");
+      return builder().chipId(chipId).devName(devName).devIcon(devIcon).devId(devId).build();
+    }
+
+    private ConnectAttempt fromCache() {
+      Context context = context();
+      if (context == null) throw new NullPointerException("no context.");
+      SharedPreferences prefs = context.getApplicationContext()
+          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
+      String chipId = prefs.getString(CHIP_ID_KEY, null);
+      String devName = prefs.getString(DEV_NAME_KEY, null);
+      String devIcon = prefs.getString(DEV_IC_KEY, null);
+      String devId = prefs.getString(DEV_ID_KEY, null);
+      return builder().chipId(chipId).devName(devName).devIcon(devIcon).devId(devId).build();
+    }
+
+    private ConnectAttempt toCache() {
+      Context context = context();
+      if (context == null) throw new NullPointerException("no context.");
+      if (chipId != null && getTrimmedLength(chipId) != 0 &&
+          devId != null && getTrimmedLength(devId) != 0) {
+        context.getApplicationContext()
+            .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(CHIP_ID_KEY, chipId)
+            .putString(DEV_NAME_KEY, devName)
+            .putString(DEV_IC_KEY, devIcon)
+            .putString(DEV_ID_KEY, devId)
+            .apply();
+      }
+      return this;
+    }
+
+    private ConnectAttempt clearCache() {
+      Context context = context();
+      if (context == null) throw new NullPointerException("no context.");
       context.getApplicationContext()
           .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
           .edit()
-          .putString(CHIP_ID_KEY, chipId)
-          .putString(DEV_NAME_KEY, devName)
-          .putString(DEV_IC_KEY, devIcon)
-          .putString(DEV_ID_KEY, devId)
+          .clear()
           .apply();
+      return this;
     }
-    reqChipIdSubject.onNext(null);
   }
 
   private VinliDevices() {

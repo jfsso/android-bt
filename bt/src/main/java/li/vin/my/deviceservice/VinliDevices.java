@@ -301,6 +301,7 @@ public final class VinliDevices {
   private static final Observable<DeviceConnection> mainBtAndConnect;
 
   static {
+    // TODO: remove this workaround when rxjava is past version 1.0.14
     mainBtAndConnect = OperatorReplayFix.create(mainInit.flatMap(mainBt).flatMap(mainConnect), 1)
         .refCount()
         .take(1);

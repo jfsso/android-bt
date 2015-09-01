@@ -22,6 +22,7 @@ import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.functions.Func2;
+import rx.internal.operators.OperatorReplayFix;
 
 /*package*/ class BtLeDeviceConnection extends BluetoothGattCallback implements DeviceConnection {
   private static final String TAG = BtLeDeviceConnection.class.getSimpleName();
@@ -75,8 +76,7 @@ import rx.functions.Func2;
   }
 
   @NonNull @Override public Observable<Void> resetDtcs() {
-    return doOp("resetDtcs", null,
-        new DeviceServiceFuncResetDtcs(chipId));
+    return doOp("resetDtcs", null, new DeviceServiceFuncResetDtcs(chipId));
   }
 
   @NonNull @Override public <T> Observable<T> observe(@NonNull final Param<T> param) {
@@ -101,22 +101,43 @@ import rx.functions.Func2;
     return getOrCreateOp(opKey, new ObservableFactory<T>() {
       @Override public Observable<T> create() {
         Log.d(TAG, "creating param observable for " + (opLabel == null ? opKey : opLabel));
-        return serviceObservable.flatMap(func.setCancelations(cancelations))
-            .retry(retryOnDisconnect)
-            .doOnUnsubscribe(func.cancelOpAction)
-            .onBackpressureLatest()
-            .doOnSubscribe(new Action0() {
-              @Override public void call() {
-                putOp(opKey);
-              }
-            })
-            .doOnUnsubscribe(new Action0() {
-              @Override public void call() {
-                Log.d(TAG, "all unsubscribed from " + (opLabel == null ? opKey : opLabel));
-                removeOp(opKey);
-              }
-            })
-            .share();
+        // TODO: use actual replay operator when past bugged rxjava version 1.0.14
+        return OperatorReplayFix.create(
+            serviceObservable.flatMap(func.setCancelations(cancelations))
+                .retry(retryOnDisconnect)
+                .doOnUnsubscribe(func.cancelOpAction)
+                .onBackpressureLatest()
+                .doOnSubscribe(new Action0() {
+                  @Override public void call() {
+                    putOp(opKey);
+                  }
+                })
+                .doOnUnsubscribe(new Action0() {
+                  @Override public void call() {
+                    Log.d(TAG, "all unsubscribed from " + (opLabel == null ? opKey : opLabel));
+                    removeOp(opKey);
+                  }
+                }), 1).refCount();
+        // ---
+        // just sharing means results throttled on distinct vals never 
+        // come through for duplicate subscribers - replay instead.
+        // ---
+        //return serviceObservable.flatMap(func.setCancelations(cancelations))
+        //    .retry(retryOnDisconnect)
+        //    .doOnUnsubscribe(func.cancelOpAction)
+        //    .onBackpressureLatest()
+        //    .doOnSubscribe(new Action0() {
+        //      @Override public void call() {
+        //        putOp(opKey);
+        //      }
+        //    })
+        //    .doOnUnsubscribe(new Action0() {
+        //      @Override public void call() {
+        //        Log.d(TAG, "all unsubscribed from " + (opLabel == null ? opKey : opLabel));
+        //        removeOp(opKey);
+        //      }
+        //    })
+        //    .share();
       }
     });
   }

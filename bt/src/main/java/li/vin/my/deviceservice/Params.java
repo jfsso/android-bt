@@ -286,7 +286,7 @@ public final class Params {
 
   private static final ConcurrentHashMap<String,PIDParam> pidParams =
       new ConcurrentHashMap<>();
-  public static PIDParam getPidParam(String code) {
+  public static Param<String> getPidParam(String code) {
     PIDParam param = pidParams.get(code);
     if (param == null) {
       param = new PIDParam(code);

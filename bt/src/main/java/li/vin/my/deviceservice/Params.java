@@ -274,13 +274,13 @@ public final class Params {
     }
   };
 
-  public static final ParamPlain<String> BATTERY_VOLTAGE = new ParamPlain<String>(Uuids.BATTERY_VOLTAGE, false, true) {
-    @Override String parseVal(String val) {
-      return val;
+  public static final ParamStream<Float> BATTERY_VOLTAGE = new ParamStream<Float>("B:") {
+    @Override Float parseVal(String val) {
+      return Integer.valueOf(val.substring(2), HEX) * 0.006f;
     }
 
-    @Override DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
-      return new DeviceServiceFuncString(chipId, name);
+    @Override DeviceServiceFunc<Float> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncFloat(chipId, name);
     }
   };
 

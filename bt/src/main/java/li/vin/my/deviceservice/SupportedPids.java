@@ -54,7 +54,7 @@ public final class SupportedPids {
     KNOWN_UNSUPPORTED_PIDS.add("50");
 
     KNOWN_UNSUPPORTED_PIDS.add("64");
-    KNOWN_UNSUPPORTED_PIDS.add("66");
+    //KNOWN_UNSUPPORTED_PIDS.add("66");
     KNOWN_UNSUPPORTED_PIDS.add("67");
     KNOWN_UNSUPPORTED_PIDS.add("68");
     KNOWN_UNSUPPORTED_PIDS.add("69");

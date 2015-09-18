@@ -10,6 +10,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class Params {
 
+  public static final Param<String> ACCEL_RAW = new ParamPlain<String>(Uuids.ACCEL, true, false) {
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val;
+    }
+  };
+
   public static final Param<Float> ACCEL_X = new ParamAccelFloat() {
     @Override public Float parseVal(byte[] val) {
       return accelConvert(val, 0);
@@ -44,7 +56,7 @@ public final class Params {
 
   public static final Param<Boolean> COLLISION = new ParamAccelBool() {
     @Override public Boolean parseVal(byte[] val) {
-      return new String(val, val.length-1, 1, ASCII).equals("1") ? Boolean.TRUE : Boolean.FALSE;
+      return !(new String(val, val.length-1, 1, ASCII).equals("0")) ? Boolean.TRUE : Boolean.FALSE;
     }
   };
 
@@ -121,6 +133,18 @@ public final class Params {
       final int b = Integer.parseInt(val.substring(4, 6), HEX);
 
       return ((a * 256) + b) / 100f;
+    }
+  };
+
+  public static final Param<String> MASS_AIRFLOW_DOS = new ParamStream<String>("66") {
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val;
     }
   };
 
@@ -216,7 +240,7 @@ public final class Params {
    * Revolutions per Minute<br>
    * units: r/m
    */
-  public static final Param<Float> RPM = new ParamStreamFloat("0C", Uuids.RPM, true) {
+  public static final Param<Float> RPM = new ParamStreamFloat("0C", Uuids.RPM, false) {
     @Override public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2, 4), HEX);
       final int b = Integer.parseInt(val.substring(4, 6), HEX);

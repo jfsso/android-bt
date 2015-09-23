@@ -23,19 +23,22 @@ public final class Params {
   };
 
   public static final Param<Float> ACCEL_X = new ParamAccelFloat() {
-    @Override public Float parseVal(byte[] val) {
+    @Override
+    public Float parseVal(byte[] val) {
       return accelConvert(val, 0);
     }
   };
 
   public static final Param<Float> ACCEL_Y = new ParamAccelFloat() {
-    @Override public Float parseVal(byte[] val) {
+    @Override
+    public Float parseVal(byte[] val) {
       return accelConvert(val, 1);
     }
   };
 
   public static final Param<Float> ACCEL_Z = new ParamAccelFloat() {
-    @Override public Float parseVal(byte[] val) {
+    @Override
+    public Float parseVal(byte[] val) {
       return accelConvert(val, 2);
     }
   };
@@ -45,7 +48,8 @@ public final class Params {
    * units: %
    */
   public static final Param<Float> CALCULATED_LOAD_VALUE = new ParamStreamFloat("04") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2), HEX);
 
       return (a * 100) / 255f;
@@ -55,8 +59,11 @@ public final class Params {
   public static final Param<String> CHIP_ID = new ParamString(Uuids.CHIP_ID, false, true);
 
   public static final Param<Boolean> COLLISION = new ParamAccelBool() {
-    @Override public Boolean parseVal(byte[] val) {
-      return !(new String(val, val.length-1, 1, ASCII).equals("0")) ? Boolean.TRUE : Boolean.FALSE;
+    @Override
+    public Boolean parseVal(byte[] val) {
+      return !(new String(val, val.length - 1, 1, ASCII).equals("0"))
+          ? Boolean.TRUE
+          : Boolean.FALSE;
     }
   };
 
@@ -65,7 +72,8 @@ public final class Params {
    * units: V
    */
   public static final Param<Float> CONTROL_MODULE_VOLTAGE = new ParamStreamFloat("42") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2, 4), HEX);
       final int b = Integer.parseInt(val.substring(4, 6), HEX);
 
@@ -78,7 +86,8 @@ public final class Params {
    * units: °C
    */
   public static final Param<Float> COOLANT_TEMP_C = new ParamStreamFloat("05") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2), HEX);
 
       return a - 40f;
@@ -90,33 +99,39 @@ public final class Params {
    * units: °F
    */
   public static final Param<Float> COOLANT_TEMP_F = new ParamStreamFloat("05") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2), HEX);
 
       return ((a - 40) * 1.8f) + 32;
     }
   };
 
-  public static final Param<List<String>> DTCS = new ParamPlain<List<String>>(Uuids.DTCS, false, true) {
-    @Override public List<String> parseVal(final String val) {
-      if (val == null) {
-        return Collections.emptyList();
-      }
+  public static final Param<List<String>> DTCS =
+      new ParamPlain<List<String>>(Uuids.DTCS, false, true) {
+        @Override
+        public List<String> parseVal(final String val) {
+          if (val == null) {
+            return Collections.emptyList();
+          }
 
-      return Arrays.asList(val.split(",")); // remove "D:" from beginning
-    }
+          return Arrays.asList(val.split(",")); // remove "D:" from beginning
+        }
 
-    @Override DeviceServiceFunc<List<String>> getServiceFunc(@NonNull String chipId, @NonNull String name) {
-      return new DeviceServiceFuncDtc(chipId, name);
-    }
-  };
+        @Override
+        DeviceServiceFunc<List<String>> getServiceFunc(@NonNull String chipId,
+            @NonNull String name) {
+          return new DeviceServiceFuncDtc(chipId, name);
+        }
+      };
 
   /**
    * Fuel level input<br>
    * units: %
    */
   public static final Param<Float> FUEL_LEVEL_INPUT = new ParamStreamFloat("2F") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.valueOf(val.substring(2), HEX);
 
       return (a * 100) / 255f;
@@ -128,7 +143,8 @@ public final class Params {
    * units: g/s
    */
   public static final Param<Float> MASS_AIRFLOW = new ParamStreamFloat("10") {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2, 4), HEX);
       final int b = Integer.parseInt(val.substring(4, 6), HEX);
 
@@ -241,7 +257,8 @@ public final class Params {
    * units: r/m
    */
   public static final Param<Float> RPM = new ParamStreamFloat("0C", Uuids.RPM, false) {
-    @Override public Float parseVal(final String val) {
+    @Override
+    public Float parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(2, 4), HEX);
       final int b = Integer.parseInt(val.substring(4, 6), HEX);
 
@@ -254,7 +271,8 @@ public final class Params {
    * units: s
    */
   public static final Param<Integer> RUNTIME_SINCE_ENGINE_START = new ParamStreamInt("1F") {
-    @Override public Integer parseVal(final String val) {
+    @Override
+    public Integer parseVal(final String val) {
       final int a = Integer.parseInt(val.substring(0, 2), HEX);
       final int b = Integer.parseInt(val.substring(2, 4), HEX);
 
@@ -267,7 +285,8 @@ public final class Params {
    * units: km/h
    */
   public static final Param<Integer> SPEED_KPH = new ParamStreamInt("0D") {
-    @Override public Integer parseVal(final String val) {
+    @Override
+    public Integer parseVal(final String val) {
       return Integer.valueOf(val.substring(2), HEX); // remove 0D from beginning
     }
   };
@@ -279,8 +298,10 @@ public final class Params {
   public static final Param<Integer> SPEED_MPH = new ParamStreamInt("0D") {
     private static final float KPH_TO_MPH = 0.621371f;
 
-    @Override public Integer parseVal(final String val) {
-      return Math.round(Integer.parseInt(val.substring(2), HEX) * KPH_TO_MPH); // remove 0D from beginning
+    @Override
+    public Integer parseVal(final String val) {
+      return Math.round(
+          Integer.parseInt(val.substring(2), HEX) * KPH_TO_MPH); // remove 0D from beginning
     }
   };
 
@@ -289,36 +310,48 @@ public final class Params {
   public static final Param<String> PIDS = new ParamString(Uuids.PIDS, false, true);
 
   public static final ParamStream<Boolean> POWER_STATUS = new ParamStream<Boolean>("P") {
-    @Override Boolean parseVal(String val) {
-      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+    @Override
+    Boolean parseVal(String val) {
+      return val.contains("1")
+          ? Boolean.TRUE
+          : Boolean.FALSE;
     }
 
-    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override
+    DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncBool(chipId, name);
     }
   };
 
   public static final ParamStream<Boolean> CONNECTION_STATUS = new ParamStream<Boolean>("C") {
-    @Override Boolean parseVal(String val) {
-      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+    @Override
+    Boolean parseVal(String val) {
+      return val.contains("1")
+          ? Boolean.TRUE
+          : Boolean.FALSE;
     }
 
-    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override
+    DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncBool(chipId, name);
     }
   };
 
   public static final ParamStream<Boolean> GPS_STATUS = new ParamStream<Boolean>("G") {
-    @Override Boolean parseVal(String val) {
-      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+    @Override
+    Boolean parseVal(String val) {
+      return val.contains("1")
+          ? Boolean.TRUE
+          : Boolean.FALSE;
     }
 
-    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override
+    DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncBool(chipId, name);
     }
   };
 
-  public static final Param<String> CONNECTION_STRENGTH = new ParamStream<String>("S:") {
+  public static final Param<String> CONNECTION_TYPE = new ParamStream<String>("S:") {
     @Override
     DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncString(chipId, name);
@@ -326,33 +359,51 @@ public final class Params {
 
     @Override
     String parseVal(String val) {
-      return val;
+      return val.substring(2).split(",")[0].trim();
+    }
+  };
+
+  public static final Param<Integer> CONNECTION_STRENGTH = new ParamStream<Integer>("S:") {
+    @Override
+    DeviceServiceFunc<Integer> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncInt(chipId, name);
+    }
+
+    @Override
+    Integer parseVal(String val) {
+      return Integer.parseInt(val.substring(2).split(",")[1].trim());
     }
   };
 
   public static final ParamStream<Float> BATTERY_VOLTAGE = new ParamStream<Float>("B:") {
-    @Override Float parseVal(String val) {
+    @Override
+    Float parseVal(String val) {
       return Integer.valueOf(val.substring(2), HEX) * 0.006f;
     }
 
-    @Override DeviceServiceFunc<Float> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+    @Override
+    DeviceServiceFunc<Float> getServiceFunc(@NonNull String chipId, @NonNull String name) {
       return new DeviceServiceFuncFloat(chipId, name);
     }
   };
 
-  private static final ConcurrentHashMap<String,PIDParam> pidParams =
-      new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, PIDParam> pidParams = new ConcurrentHashMap<>();
+
   public static Param<String> getPidParam(String code) {
     PIDParam param = pidParams.get(code);
     if (param == null) {
       param = new PIDParam(code);
       PIDParam old = pidParams.putIfAbsent(code, param);
-      param = old != null ? old : param;
+      param = old != null
+          ? old
+          : param;
     }
     return param;
   }
 
-  /*package*/ @SuppressWarnings("unchecked") static <T> ParamImpl<T, ?> paramFor(@NonNull String name) throws RuntimeException {
+  /*package*/
+  @SuppressWarnings("unchecked")
+  static <T> ParamImpl<T, ?> paramFor(@NonNull String name) throws RuntimeException {
     try {
       if (name.startsWith("PIDParam")) {
         return (ParamImpl<T, ?>) getPidParam(name.substring("PIDParam".length()));
@@ -363,9 +414,10 @@ public final class Params {
     }
   }
 
-  /*package*/ static String nameFor(@NonNull Param<?> p) {
+  /*package*/
+  static String nameFor(@NonNull Param<?> p) {
     if (p instanceof PIDParam) {
-      return "PIDParam"+p.getCode();
+      return "PIDParam" + p.getCode();
     }
     try {
       for (Field f : Params.class.getFields()) {
@@ -380,5 +432,6 @@ public final class Params {
     return null;
   }
 
-  private Params() { }
+  private Params() {
+  }
 }

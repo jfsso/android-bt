@@ -298,6 +298,38 @@ public final class Params {
     }
   };
 
+  public static final ParamStream<Boolean> CONNECTION_STATUS = new ParamStream<Boolean>("C") {
+    @Override Boolean parseVal(String val) {
+      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+    }
+
+    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncBool(chipId, name);
+    }
+  };
+
+  public static final ParamStream<Boolean> GPS_STATUS = new ParamStream<Boolean>("G") {
+    @Override Boolean parseVal(String val) {
+      return val.contains("1") ? Boolean.TRUE : Boolean.FALSE;
+    }
+
+    @Override DeviceServiceFunc<Boolean> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncBool(chipId, name);
+    }
+  };
+
+  public static final Param<String> CONNECTION_STRENGTH = new ParamStream<String>("S:") {
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val;
+    }
+  };
+
   public static final ParamStream<Float> BATTERY_VOLTAGE = new ParamStream<Float>("B:") {
     @Override Float parseVal(String val) {
       return Integer.valueOf(val.substring(2), HEX) * 0.006f;

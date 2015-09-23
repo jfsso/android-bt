@@ -65,10 +65,24 @@ import java.util.UUID;
       } else {
         throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
       }
+    } else if (val[stt] == 'S' && val[stt+1] == ':') {
+      if (end > stt+2) {
+        return "S:" + new String(val, stt + 2, end - (stt + 2), ASCII);
+      } else {
+        throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
+      }
     } else if (val[stt] == 'P' && val[stt+1] == '0') {
       return "P0";
     } else if (val[stt] == 'P' && val[stt+1] == '1') {
       return "P1";
+    } else if (val[stt] == 'C' && val[stt+1] == '0') {
+      return "C0";
+    } else if (val[stt] == 'C' && val[stt+1] == '1') {
+      return "C1";
+    } else if (val[stt] == 'G' && val[stt+1] == '0') {
+      return "G0";
+    } else if (val[stt] == 'G' && val[stt+1] == '1') {
+      return "G1";
     } else {
       throw new RuntimeException("unknown streaming characteristic("+
           new String(val, stt, end - stt, ASCII)+") " +

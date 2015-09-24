@@ -1,5 +1,6 @@
 package li.vin.my.deviceservice;
 
+import android.bluetooth.BluetoothGattCharacteristic;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import java.lang.reflect.Field;
@@ -305,7 +306,14 @@ public final class Params {
     }
   };
 
-  public static final Param<String> VIN = new ParamString(Uuids.VIN, false, true);
+  public static final Param<String> VIN = new ParamString(Uuids.VIN, false, true) {
+    @Override
+    public String parseCharacteristic(BluetoothGattCharacteristic characteristic) {
+      String parsed = super.parseCharacteristic(characteristic);
+      if (parsed.startsWith("NULL")) throw new RuntimeException("corrupt VIN.");
+      return parsed;
+    }
+  };
 
   public static final Param<String> PIDS = new ParamString(Uuids.PIDS, false, true);
 

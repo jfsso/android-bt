@@ -310,7 +310,9 @@ public final class Params {
     @Override
     public String parseCharacteristic(BluetoothGattCharacteristic characteristic) {
       String parsed = super.parseCharacteristic(characteristic);
-      if (parsed.startsWith("NULL")) throw new RuntimeException("corrupt VIN.");
+      if (parsed.startsWith("NULL") || !parsed.matches("^[A-Z0-9]{17}$")) {
+        throw new RuntimeException("corrupt VIN.");
+      }
       return parsed;
     }
   };

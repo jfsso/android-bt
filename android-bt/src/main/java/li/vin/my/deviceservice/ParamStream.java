@@ -59,6 +59,13 @@ import java.util.UUID;
       } else {
         throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
       }
+    } else if (len >= 5 && val[stt] == 'S' && val[stt+1] == 'V' && val[stt+2] == 'E' &&
+        val[stt+3] == 'R' && val[stt+4] == ':') {
+      if (end > stt+5) {
+        return "SVER:" + new String(val, stt + 5, end - (stt + 5), ASCII);
+      } else {
+        throw new RuntimeException("empty streaming characteristic " + characteristic.getUuid());
+      }
     } else if (val[stt] == 'B' && val[stt+1] == ':') {
       if (end > stt+2) {
         return "B:" + new String(val, stt + 2, end - (stt + 2), ASCII);

@@ -387,6 +387,18 @@ public final class Params {
     }
   };
 
+  public static final Param<String> BLE_VERSION = new ParamStream<String>("SVER:") {
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val.substring(5).trim();
+    }
+  };
+
   public static final ParamStream<Float> BATTERY_VOLTAGE = new ParamStream<Float>("B:") {
     @Override
     Float parseVal(String val) {

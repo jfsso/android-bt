@@ -359,7 +359,9 @@ public final class Params {
 
     @Override
     String parseVal(String val) {
-      return val.substring(2).split(",")[0].trim();
+      val = val.substring(2).split(",")[0].trim();
+      if (val.equalsIgnoreCase("null")) throw new RuntimeException("unknown connection type.");
+      return val;
     }
   };
 

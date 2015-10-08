@@ -394,7 +394,9 @@ public final class VinliDevices {
         Log.e(TAG, "isBluetoothEnabled found null BluetoothAdapter.");
         return false;
       }
-      return adapter.isEnabled();
+      return adapter.isEnabled() ||
+          adapter.getState() == BluetoothAdapter.STATE_ON ||
+          adapter.getState() == BluetoothAdapter.STATE_TURNING_ON;
     } catch (Exception e) {
       Log.e(TAG, "isBluetoothEnabled error", e);
       return false;

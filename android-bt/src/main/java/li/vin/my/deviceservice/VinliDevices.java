@@ -73,6 +73,24 @@ public final class VinliDevices {
   }
 
   /**
+   * Determine whether there is a cached valid connection. As long as this returns true and
+   * Bluetooth is enabled, {@link #connect(Context, String, String)} will be able to connect
+   * immediately without an Activity context available to summon UI for user authorization.
+   * <br><br>
+   * Use this to determine if it's safe to call connect from a non-Activity Context, such as from
+   * a background service. If this returns false, the connection will fail without an Activity
+   * Context.
+   */
+  public static boolean hasCachedValidConnection(@NonNull Context context) {
+    SharedPreferences prefs = context.getApplicationContext()
+        .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
+    String chipId = prefs.getString(CHIP_ID_KEY, null);
+    String devId = prefs.getString(DEV_ID_KEY, null);
+    return (chipId != null && getTrimmedLength(chipId) != 0 &&
+        devId != null && getTrimmedLength(devId) != 0);
+  }
+
+  /**
    * Determine whether or not the given {@link Intent} is related to Vinli and relevant to the
    * current application. If this returns false, the data is invalid or possibly related to an
    * unknown or unrelated Vinli device, and should be ignored.

@@ -18,6 +18,8 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.widget.Toast;
 import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import rx.Observable;
 import rx.Subscriber;
@@ -36,25 +38,38 @@ public final class VinliDevices {
   private static final String DEV_IC_KEY = TAG + ".deviceicon";
   private static final String DEV_ID_KEY = TAG + ".deviceid";
 
-  private static volatile BtLeDeviceConnection deviceConn = null;
+  private static Map<String, BtLeDeviceConnection> deviceConns = new HashMap<>();
 
   private static BtLeDeviceConnection makeOrUpdateConnection(Context context, String chipId,
       String name, String icon, String id) {
+
+    String key = chipId.length() >= 4
+        ? chipId.substring(chipId.length() - 4, chipId.length())
+        : chipId;
+
     BtLeDeviceConnection result;
     synchronized (VinliDevices.class) {
-      result = deviceConn;
+      result = deviceConns.get(key);
       if (result == null) {
-        deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon, id);
+        deviceConns.put(key, result = new BtLeDeviceConnection(context, chipId, name, icon, id));
       } else {
-        if (!deviceConn.chipId.equals(chipId)) {
-          deviceConn.shutdown();
-          deviceConn = result = new BtLeDeviceConnection(context, chipId, name, icon, id);
+        if (!chipIdsMatch(result.chipId, chipId)) {
+          result.shutdown();
+          deviceConns.put(key, result = new BtLeDeviceConnection(context, chipId, name, icon, id));
         } else {
-          deviceConn.updateContext(context);
+          result.updateContext(context);
         }
       }
     }
     return result;
+  }
+
+  /*package*/ static boolean chipIdsMatch(String chipId1, String chipId2) {
+    if (chipId1 == null || chipId2 == null) return false;
+    if (chipId1.length() > chipId2.length()) {
+      return chipId1.endsWith(chipId2);
+    }
+    return chipId2.endsWith(chipId1);
   }
 
   /**

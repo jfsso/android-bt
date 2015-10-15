@@ -95,13 +95,12 @@ public final class VinliDevices {
    * current application. If this returns false, the data is invalid or possibly related to an
    * unknown or unrelated Vinli device, and should be ignored.
    */
-  @SuppressWarnings("unused") public static boolean intentIsRelevant(@NonNull Context context,
-      Intent intent) {
-    if (intent == null) return false;
-    String intentTarget = intent.getStringExtra("li.vin.my.chip_id");
-    return intentTarget != null && intentTarget.equals(context.getApplicationContext()
-        .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-        .getString(CHIP_ID_KEY, null));
+  @SuppressWarnings("unused")
+  public static boolean intentIsRelevant(@NonNull Context context, Intent intent) {
+    return intent != null && chipIdsMatch(intent.getStringExtra("li.vin.my.chip_id"),
+        context.getApplicationContext()
+            .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(CHIP_ID_KEY, null));
   }
 
   /**

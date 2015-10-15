@@ -411,6 +411,42 @@ public final class Params {
     }
   };
 
+  public static final Param<String> RAW_STREAM = new ParamPlain<String>(Uuids.STREAM, true, false) {
+
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val.trim();
+    }
+
+    @Override
+    public Boolean matches(String val) {
+      return val.startsWith("41");
+    }
+  };
+
+  public static final Param<String> RAW_RPM = new ParamPlain<String>(Uuids.RPM, true, false) {
+
+    @Override
+    DeviceServiceFunc<String> getServiceFunc(@NonNull String chipId, @NonNull String name) {
+      return new DeviceServiceFuncString(chipId, name);
+    }
+
+    @Override
+    String parseVal(String val) {
+      return val.trim();
+    }
+
+    @Override
+    public Boolean matches(String val) {
+      return val.startsWith("41");
+    }
+  };
+
   private static final ConcurrentHashMap<String, PIDParam> pidParams = new ConcurrentHashMap<>();
 
   public static Param<String> getPidParam(String code) {

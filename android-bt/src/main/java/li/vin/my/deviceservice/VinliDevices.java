@@ -13,6 +13,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -21,6 +23,7 @@ import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Func1;
@@ -28,6 +31,7 @@ import rx.internal.operators.OperatorReplayFix;
 import rx.subjects.BehaviorSubject;
 import rx.subjects.PublishSubject;
 
+import static android.content.Context.BLUETOOTH_SERVICE;
 import static android.text.TextUtils.getTrimmedLength;
 
 public final class VinliDevices {
@@ -198,18 +202,39 @@ public final class VinliDevices {
           if (context == null) return Observable.error(new RuntimeException("no context."));
           if (isBluetoothEnabled(context)) return Observable.just(connAttempt);
 
+          final AtomicInteger attempts = new AtomicInteger();
+          final Handler handler = new Handler(Looper.getMainLooper());
+
           return Observable.create(new Observable.OnSubscribe<ConnectAttempt>() {
             @Override public void call(final Subscriber<? super ConnectAttempt> subscriber) {
 
-              if (checkBtAttempt(connAttempt, subscriber, false)) {
-                return;
-              }
-
+              if (subscriber.isUnsubscribed()) return;
               Context ctx = connAttempt.context();
               if (ctx == null) {
                 subscriber.onError(new RuntimeException("no context."));
                 return;
               }
+
+              // If Bluetooth is not initially enabled, we'll wait a little while before summoning
+              // UI to prompt for an enable to to see if it's just delayed coming on. the Bluetooth
+              // adapter's state can be a little bit laggy in some instances, and we don't want to
+              // prompt the user if not necessary, or even worse, fail outright because of an
+              // attempt to launch UI from a non-Activity context.
+              if (attempts.getAndDecrement() < 5 && isBluetoothDisabled(ctx)) {
+                final Observable.OnSubscribe<ConnectAttempt> onSub = this;
+                handler.postDelayed(new Runnable() {
+                  @Override
+                  public void run() {
+                    onSub.call(subscriber);
+                  }
+                }, 100);
+                return;
+              }
+
+              if (checkBtAttempt(connAttempt, subscriber, false)) {
+                return;
+              }
+
               final Context appContext = ctx.getApplicationContext();
 
               final BroadcastReceiver recv = new BroadcastReceiver() {
@@ -413,10 +438,32 @@ public final class VinliDevices {
         .create();
   }
 
+  /** Internal helper to determine if Bluetooth is in any state other than definitely enabled. */
+  private static boolean isBluetoothDisabled(@NonNull Context context) {
+    try {
+      BluetoothManager mgr = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
+      if (mgr == null) {
+        Log.e(TAG, "isBluetoothDisabling found null BluetoothManager.");
+        return true;
+      }
+      BluetoothAdapter adapter = mgr.getAdapter();
+      if (adapter == null) {
+        Log.e(TAG, "isBluetoothDisabling found null BluetoothAdapter.");
+        return true;
+      }
+      return !adapter.isEnabled() ||
+          adapter.getState() == BluetoothAdapter.STATE_OFF ||
+          adapter.getState() == BluetoothAdapter.STATE_TURNING_OFF;
+    } catch (Exception e) {
+      Log.e(TAG, "isBluetoothDisabling error", e);
+      return true;
+    }
+  }
+
   /** Helper to quickly and safely determine if the default Bluetooth adapter is enabled. */
   public static boolean isBluetoothEnabled(@NonNull Context context) {
     try {
-      BluetoothManager mgr = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+      BluetoothManager mgr = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
       if (mgr == null) {
         Log.e(TAG, "isBluetoothEnabled found null BluetoothManager.");
         return false;

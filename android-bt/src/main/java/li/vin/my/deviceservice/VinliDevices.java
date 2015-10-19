@@ -461,7 +461,7 @@ public final class VinliDevices {
   }
 
   /** Helper to quickly and safely determine if the default Bluetooth adapter is enabled. */
-  public static boolean isBluetoothEnabled(@NonNull Context context) {
+  private static boolean isBluetoothEnabled(@NonNull Context context) {
     try {
       BluetoothManager mgr = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
       if (mgr == null) {

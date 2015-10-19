@@ -179,7 +179,10 @@ public final class VinliDevices {
 
   private static boolean checkConnectAttempt(ConnectAttempt connAttempt,
       Subscriber<? super DeviceConnection> subscriber, boolean errorIfNone) {
-    if (subscriber.isUnsubscribed()) return true;
+    if (subscriber.isUnsubscribed()) {
+      Log.i(TAG, "checkConnectAttempt returning on unsubscriber subscriber.");
+      return true;
+    }
     Context context = connAttempt.context();
     if (context != null &&
         connAttempt.chipId != null && getTrimmedLength(connAttempt.chipId) != 0 &&
@@ -187,9 +190,13 @@ public final class VinliDevices {
       subscriber.onNext(makeOrUpdateConnection(context, connAttempt.chipId, connAttempt.devName,
           connAttempt.devIcon, connAttempt.devId));
       subscriber.onCompleted();
+      Log.i(TAG, "checkConnectAttempt returning success.");
       return true;
     } else if (errorIfNone) {
+      Log.i(TAG, "checkConnectAttempt returning definite error.");
       subscriber.onError(new RuntimeException("connection failed."));
+    } else {
+      Log.i(TAG, "checkConnectAttempt returning default error.");
     }
     return false;
   }

@@ -109,13 +109,27 @@ public final class VinliDevices {
 
   /**
    * Convenience to connect to the last known cached device, not forcing a fresh device scan. This
-   * should almost always be used unless the user explicitly requests a fresh device choice.
+   * should almost always be used unless the user explicitly requests a fresh device choice. Note
+   * that autoEnableBt defaults to true with this call.
    *
-   * @see #connect(Context, String, String, boolean)
+   * @see #connect(Context, String, String, boolean, boolean)
    */
   @SuppressWarnings("unused") public static @NonNull Observable<DeviceConnection> connect(
       @NonNull Context context, @NonNull final String clientId, @NonNull final String redirectUri) {
-    return connect(context, clientId, redirectUri, false);
+    return connect(context, clientId, redirectUri, false, true);
+  }
+
+  /**
+   * Convenience to connect with autoEnableBt defaulted to true.
+   *
+   * @see #connect(Context, String, String, boolean, boolean)
+   */
+  @SuppressWarnings("unused")
+  public static
+  @NonNull
+  Observable<DeviceConnection> connect(@NonNull final Context context,
+      @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshDevice) {
+    return connect(context, clientId, redirectUri, forceFreshDevice, true);
   }
 
   /**
@@ -138,9 +152,12 @@ public final class VinliDevices {
    * @param forceFreshDevice Forces My Vinli to initiate a Bluetooth scan of nearby devices and
    * make a fresh choice rather than automatically connecting to the last known device. It may be
    * helpful to set this to true in response to a user action explicitly requesting a fresh choice.
+   * @param autoEnableBt Whether or not to automatically prompt the user to enable Bluetooth if it
+   * is not already enabled.
    */
   public static @NonNull Observable<DeviceConnection> connect(@NonNull final Context context,
-      @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshDevice) {
+      @NonNull final String clientId, @NonNull final String redirectUri, boolean forceFreshDevice,
+      boolean autoEnableBt) {
     if (!isMyVinliInstalledAndUpdated(context)) {
       return Observable.error(new Exception(
           "My Vinli is not installed - use isMyVinliInstalledAndUpdated "
@@ -149,6 +166,7 @@ public final class VinliDevices {
     ConnectAttempt connectAttempt = new ConnectAttempt.Builder().context(context)
         .clientId(clientId)
         .redirectUri(redirectUri)
+        .autoEnableBt(autoEnableBt)
         .build();
     if (forceFreshDevice) {
       connectAttempt.clearCache();
@@ -244,6 +262,11 @@ public final class VinliDevices {
                     onSub.call(subscriber);
                   }
                 }, 50);
+                return;
+              }
+
+              if (!connAttempt.autoEnableBt) {
+                checkBtAttempt(connAttempt, subscriber, true);
                 return;
               }
 
@@ -509,6 +532,7 @@ public final class VinliDevices {
     private final String devName;
     private final String devIcon;
     private final String devId;
+    private boolean autoEnableBt;
 
     /*package*/ static class Builder {
       private WeakReference<Context> contextRef;
@@ -519,6 +543,7 @@ public final class VinliDevices {
       private String devName;
       private String devIcon;
       private String devId;
+      private boolean autoEnableBt;
 
       private Builder context(Context context) {
         contextRef = new WeakReference<>(context);
@@ -555,6 +580,11 @@ public final class VinliDevices {
         return this;
       }
 
+      /*package*/ Builder autoEnableBt(boolean autoEnableBt) {
+        this.autoEnableBt = autoEnableBt;
+        return this;
+      }
+
       /*package*/ ConnectAttempt build() {
         Context context;
         if (contextRef == null || (context = contextRef.get()) == null) {
@@ -562,12 +592,14 @@ public final class VinliDevices {
         }
         if (clientId == null) throw new NullPointerException("need client id.");
         if (redirectUri == null) throw new NullPointerException("need redirect uri.");
-        return new ConnectAttempt(context, clientId, redirectUri, chipId, devName, devIcon, devId);
+        return new ConnectAttempt(context, clientId, redirectUri, chipId, devName, devIcon, devId,
+            autoEnableBt);
       }
     }
 
     private ConnectAttempt(@NonNull Context context, @NonNull String clientId,
-        @NonNull String redirectUri, String chipId, String devName, String devIcon, String devId) {
+        @NonNull String redirectUri, String chipId, String devName, String devIcon, String devId,
+        boolean autoEnableBt) {
       this.contextRef = new WeakReference<>(context);
       this.clientId = clientId;
       this.redirectUri = redirectUri;
@@ -575,6 +607,7 @@ public final class VinliDevices {
       this.devName = devName;
       this.devIcon = devIcon;
       this.devId = devId;
+      this.autoEnableBt = autoEnableBt;
     }
 
     /*package*/ Builder builder() {

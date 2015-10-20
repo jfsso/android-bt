@@ -209,6 +209,7 @@ public final class VinliDevices {
           if (context == null) return Observable.error(new RuntimeException("no context."));
           if (isBluetoothEnabled(context)) return Observable.just(connAttempt);
 
+          final AtomicInteger threshold = new AtomicInteger(20);
           final AtomicInteger attempts = new AtomicInteger();
           final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -226,19 +227,23 @@ public final class VinliDevices {
                 return;
               }
 
+              if (isBluetoothChangingState(ctx)) {
+                threshold.set(40);
+              }
+
               // If Bluetooth is not initially enabled, we'll wait a little while before summoning
               // UI to prompt for an enable to to see if it's just delayed coming on. the Bluetooth
               // adapter's state can be a little bit laggy in some instances, and we don't want to
               // prompt the user if not necessary, or even worse, fail outright because of an
               // attempt to launch UI from a non-Activity context.
-              if (attempts.getAndIncrement() < 5) {
+              if (attempts.getAndIncrement() < threshold.get()) {
                 final Observable.OnSubscribe<ConnectAttempt> onSub = this;
                 handler.postDelayed(new Runnable() {
                   @Override
                   public void run() {
                     onSub.call(subscriber);
                   }
-                }, 100);
+                }, 50);
                 return;
               }
 
@@ -445,25 +450,24 @@ public final class VinliDevices {
         .create();
   }
 
-  /** Internal helper to determine if Bluetooth is in any state other than definitely enabled. */
-  private static boolean isBluetoothDisabled(@NonNull Context context) {
+  /** Helper to quickly and safely determine if the default Bluetooth adapter is changing state. */
+  private static boolean isBluetoothChangingState(@NonNull Context context) {
     try {
       BluetoothManager mgr = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
       if (mgr == null) {
-        Log.e(TAG, "isBluetoothDisabling found null BluetoothManager.");
-        return true;
+        Log.e(TAG, "isBluetoothEnabled found null BluetoothManager.");
+        return false;
       }
       BluetoothAdapter adapter = mgr.getAdapter();
       if (adapter == null) {
-        Log.e(TAG, "isBluetoothDisabling found null BluetoothAdapter.");
-        return true;
+        Log.e(TAG, "isBluetoothEnabled found null BluetoothAdapter.");
+        return false;
       }
-      return !adapter.isEnabled() ||
-          adapter.getState() == BluetoothAdapter.STATE_OFF ||
-          adapter.getState() == BluetoothAdapter.STATE_TURNING_OFF;
+      return adapter.getState() == BluetoothAdapter.STATE_TURNING_OFF ||
+          adapter.getState() == BluetoothAdapter.STATE_TURNING_ON;
     } catch (Exception e) {
-      Log.e(TAG, "isBluetoothDisabling error", e);
-      return true;
+      Log.e(TAG, "isBluetoothEnabled error", e);
+      return false;
     }
   }
 

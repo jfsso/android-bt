@@ -110,16 +110,22 @@ public final class VinliDevices {
   @SuppressWarnings("unused")
   public static void useFlatFileCache() {
     TargetCache result = _targetCache;
+    boolean alreadySet = false;
     if (result == null) {
       synchronized (VinliDevices.class) {
         result = _targetCache;
         if (result == null) {
-          _targetCache = new FlatFileTargetCache();
+          _targetCache = result = new FlatFileTargetCache();
         } else {
-          throw new RuntimeException(
-              "useFlatFileCache must be called only once, before any other calls.");
+          alreadySet = true;
         }
       }
+    } else {
+      alreadySet = true;
+    }
+    if (alreadySet) {
+      throw new RuntimeException(
+          "useFlatFileCache must be called only once, before any other calls.");
     }
   }
 

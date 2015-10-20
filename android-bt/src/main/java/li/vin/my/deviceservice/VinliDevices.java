@@ -1,7 +1,9 @@
 package li.vin.my.deviceservice;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
@@ -19,7 +21,15 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.widget.Toast;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +53,21 @@ public final class VinliDevices {
   private static final String DEV_ID_KEY = TAG + ".deviceid";
 
   private static Map<String, BtLeDeviceConnection> deviceConns = new HashMap<>();
+
+  private static volatile TargetCache _targetCache;
+
+  private static TargetCache targetCache() {
+    TargetCache result = _targetCache;
+    if (result == null) {
+      synchronized (VinliDevices.class) {
+        result = _targetCache;
+        if (result == null) {
+          _targetCache = result = new SharedPrefsTargetCache();
+        }
+      }
+    }
+    return result;
+  }
 
   private static BtLeDeviceConnection makeOrUpdateConnection(Context context, String chipId,
       String name, String icon, String id) {
@@ -77,6 +102,28 @@ public final class VinliDevices {
   }
 
   /**
+   * Call to override default use of SharedPreferences cache with a flat file cache. This must
+   * only be called once, and must be used before any other calls to the VinliDevices API. The
+   * application will crash with an unchecked exception if these rules are violated. It is best to
+   * call this in {@link Application#onCreate()}.
+   */
+  @SuppressWarnings("unused")
+  public static void useFlatFileCache() {
+    TargetCache result = _targetCache;
+    if (result == null) {
+      synchronized (VinliDevices.class) {
+        result = _targetCache;
+        if (result == null) {
+          _targetCache = new FlatFileTargetCache();
+        } else {
+          throw new RuntimeException(
+              "useFlatFileCache must be called only once, before any other calls.");
+        }
+      }
+    }
+  }
+
+  /**
    * Determine whether there is a cached valid connection. As long as this returns true and
    * Bluetooth is enabled, {@link #connect(Context, String, String)} will be able to connect
    * immediately without an Activity context available to summon UI for user authorization.
@@ -86,10 +133,11 @@ public final class VinliDevices {
    * Context.
    */
   public static boolean hasCachedValidConnection(@NonNull Context context) {
-    SharedPreferences prefs = context.getApplicationContext()
-        .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
-    String chipId = prefs.getString(CHIP_ID_KEY, null);
-    String devId = prefs.getString(DEV_ID_KEY, null);
+    TargetCache cache = targetCache();
+    cache.beginBatch(context);
+    String chipId = cache.getChipId();
+    String devId = cache.getDevId();
+    cache.endBatch(context);
     return (chipId != null && getTrimmedLength(chipId) != 0 &&
         devId != null && getTrimmedLength(devId) != 0);
   }
@@ -101,10 +149,11 @@ public final class VinliDevices {
    */
   @SuppressWarnings("unused")
   public static boolean intentIsRelevant(@NonNull Context context, Intent intent) {
-    return intent != null && chipIdsMatch(intent.getStringExtra("li.vin.my.chip_id"),
-        context.getApplicationContext()
-            .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(CHIP_ID_KEY, null));
+    TargetCache cache = targetCache();
+    cache.beginBatch(context);
+    String chipId = cache.getChipId();
+    cache.endBatch(context);
+    return intent != null && chipIdsMatch(intent.getStringExtra("li.vin.my.chip_id"), chipId);
   }
 
   /**
@@ -643,12 +692,13 @@ public final class VinliDevices {
     private ConnectAttempt fromCache() {
       Context context = context();
       if (context == null) throw new NullPointerException("no context.");
-      SharedPreferences prefs = context.getApplicationContext()
-          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
-      String chipId = prefs.getString(CHIP_ID_KEY, null);
-      String devName = prefs.getString(DEV_NAME_KEY, null);
-      String devIcon = prefs.getString(DEV_IC_KEY, null);
-      String devId = prefs.getString(DEV_ID_KEY, null);
+      TargetCache cache = targetCache();
+      cache.beginBatch(context);
+      String chipId = cache.getChipId();
+      String devName = cache.getDevName();
+      String devIcon = cache.getDevIcon();
+      String devId = cache.getDevId();
+      cache.endBatch(context);
       return builder().chipId(chipId).devName(devName).devIcon(devIcon).devId(devId).build();
     }
 
@@ -657,14 +707,13 @@ public final class VinliDevices {
       if (context == null) throw new NullPointerException("no context.");
       if (chipId != null && getTrimmedLength(chipId) != 0 &&
           devId != null && getTrimmedLength(devId) != 0) {
-        context.getApplicationContext()
-            .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(CHIP_ID_KEY, chipId)
-            .putString(DEV_NAME_KEY, devName)
-            .putString(DEV_IC_KEY, devIcon)
-            .putString(DEV_ID_KEY, devId)
-            .apply();
+        TargetCache cache = targetCache();
+        cache.beginBatch(context);
+        cache.putChipId(chipId);
+        cache.putDevName(devName);
+        cache.putDevIcon(devIcon);
+        cache.putDevId(devId);
+        cache.endBatch(context);
       }
       return this;
     }
@@ -672,12 +721,213 @@ public final class VinliDevices {
     private ConnectAttempt clearCache() {
       Context context = context();
       if (context == null) throw new NullPointerException("no context.");
-      context.getApplicationContext()
-          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE)
-          .edit()
-          .clear()
-          .apply();
+      TargetCache cache = targetCache();
+      cache.beginBatch(context);
+      cache.clear();
+      cache.endBatch(context);
       return this;
+    }
+  }
+
+  private interface TargetCache {
+
+    void beginBatch(@NonNull Context context);
+
+    void endBatch(@NonNull Context context);
+
+    String getChipId();
+
+    String getDevName();
+
+    String getDevIcon();
+
+    String getDevId();
+
+    void putChipId(String chipId);
+
+    void putDevName(String devName);
+
+    void putDevIcon(String devIcon);
+
+    void putDevId(String devId);
+
+    void clear();
+  }
+
+  @SuppressLint("CommitPrefEdits")
+  private static class SharedPrefsTargetCache implements TargetCache {
+
+    private SharedPreferences prefs;
+    private SharedPreferences.Editor edit;
+
+    @Override
+    public void beginBatch(@NonNull Context context) {
+      if (prefs != null) throw new IllegalStateException("endBatch never called.");
+      prefs = context.getApplicationContext()
+          .getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    @Override
+    public void endBatch(@NonNull Context context) {
+      if (prefs == null) throw new IllegalStateException("beginBatch never called.");
+      prefs = null;
+      if (edit != null) {
+        edit.apply();
+        edit = null;
+      }
+    }
+
+    @Override
+    public String getChipId() {
+      return prefs.getString(CHIP_ID_KEY, null);
+    }
+
+    @Override
+    public String getDevName() {
+      return prefs.getString(DEV_NAME_KEY, null);
+    }
+
+    @Override
+    public String getDevIcon() {
+      return prefs.getString(DEV_IC_KEY, null);
+    }
+
+    @Override
+    public String getDevId() {
+      return prefs.getString(DEV_ID_KEY, null);
+    }
+
+    @Override
+    public void putChipId(String chipId) {
+      if (edit == null) edit = prefs.edit();
+      edit.putString(CHIP_ID_KEY, chipId);
+    }
+
+    @Override
+    public void putDevName(String devName) {
+      if (edit == null) edit = prefs.edit();
+      edit.putString(DEV_NAME_KEY, devName);
+    }
+
+    @Override
+    public void putDevIcon(String devIcon) {
+      if (edit == null) edit = prefs.edit();
+      edit.putString(DEV_IC_KEY, devIcon);
+    }
+
+    @Override
+    public void putDevId(String devId) {
+      if (edit == null) edit = prefs.edit();
+      edit.putString(DEV_ID_KEY, devId);
+    }
+
+    @Override
+    public void clear() {
+      if (edit == null) edit = prefs.edit();
+      edit.clear();
+    }
+  }
+
+  private static class FlatFileTargetCache implements TargetCache {
+
+    private Context context;
+
+    private String getVal(String key) {
+      File f = new File(context.getFilesDir(), SHARED_PREFS_NAME + "." + key);
+      InputStream is = null;
+      try {
+        is = new FileInputStream(f);
+        return new BufferedReader(new InputStreamReader(is)).readLine().trim();
+      } catch (Exception ignored) {
+      } finally {
+        if (is != null) {
+          try {
+            is.close();
+          } catch (Exception ignored) {
+          }
+        }
+      }
+      return null;
+    }
+
+    private void putVal(String key, String val) {
+      File f = new File(context.getFilesDir(), SHARED_PREFS_NAME + "." + key);
+      //noinspection ResultOfMethodCallIgnored
+      f.delete();
+      if (val == null) return;
+      OutputStream os = null;
+      try {
+        os = new FileOutputStream(f);
+        os.write(val.getBytes(Charset.forName("UTF-8")));
+      } catch (Exception ignored) {
+      } finally {
+        if (os != null) {
+          try {
+            os.close();
+          } catch (Exception ignored) {
+          }
+        }
+      }
+    }
+
+    @Override
+    public void beginBatch(@NonNull Context context) {
+      if (this.context != null) throw new IllegalStateException("endBatch never called.");
+      this.context = context.getApplicationContext();
+    }
+
+    @Override
+    public void endBatch(@NonNull Context context) {
+      if (this.context == null) throw new IllegalStateException("beginBatch never called.");
+      this.context = null;
+    }
+
+    @Override
+    public String getChipId() {
+      return getVal("chipId");
+    }
+
+    @Override
+    public String getDevName() {
+      return getVal("devName");
+    }
+
+    @Override
+    public String getDevIcon() {
+      return getVal("devIcon");
+    }
+
+    @Override
+    public String getDevId() {
+      return getVal("devId");
+    }
+
+    @Override
+    public void putChipId(String chipId) {
+      putVal("chipId", chipId);
+    }
+
+    @Override
+    public void putDevName(String devName) {
+      putVal("devName", devName);
+    }
+
+    @Override
+    public void putDevIcon(String devIcon) {
+      putVal("devIcon", devIcon);
+    }
+
+    @Override
+    public void putDevId(String devId) {
+      putVal("devId", devId);
+    }
+
+    @Override
+    public void clear() {
+      putChipId(null);
+      putDevName(null);
+      putDevIcon(null);
+      putDevId(null);
     }
   }
 

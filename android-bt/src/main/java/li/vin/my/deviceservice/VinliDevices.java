@@ -222,12 +222,16 @@ public final class VinliDevices {
                 return;
               }
 
+              if (checkBtAttempt(connAttempt, subscriber, false)) {
+                return;
+              }
+
               // If Bluetooth is not initially enabled, we'll wait a little while before summoning
               // UI to prompt for an enable to to see if it's just delayed coming on. the Bluetooth
               // adapter's state can be a little bit laggy in some instances, and we don't want to
               // prompt the user if not necessary, or even worse, fail outright because of an
               // attempt to launch UI from a non-Activity context.
-              if (attempts.getAndDecrement() < 5 && isBluetoothDisabled(ctx)) {
+              if (attempts.getAndIncrement() < 5) {
                 final Observable.OnSubscribe<ConnectAttempt> onSub = this;
                 handler.postDelayed(new Runnable() {
                   @Override
@@ -235,10 +239,6 @@ public final class VinliDevices {
                     onSub.call(subscriber);
                   }
                 }, 100);
-                return;
-              }
-
-              if (checkBtAttempt(connAttempt, subscriber, false)) {
                 return;
               }
 

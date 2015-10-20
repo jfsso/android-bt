@@ -209,7 +209,7 @@ public final class VinliDevices {
           if (context == null) return Observable.error(new RuntimeException("no context."));
           if (isBluetoothEnabled(context)) return Observable.just(connAttempt);
 
-          final AtomicInteger threshold = new AtomicInteger(20);
+          final AtomicInteger threshold = new AtomicInteger(30);
           final AtomicInteger attempts = new AtomicInteger();
           final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -228,7 +228,7 @@ public final class VinliDevices {
               }
 
               if (isBluetoothChangingState(ctx)) {
-                threshold.set(40);
+                threshold.set(60);
               }
 
               // If Bluetooth is not initially enabled, we'll wait a little while before summoning

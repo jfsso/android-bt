@@ -115,7 +115,7 @@ public final class VinliDevices {
       synchronized (VinliDevices.class) {
         result = _targetCache;
         if (result == null) {
-          _targetCache = result = new FlatFileTargetCache();
+          _targetCache = new FlatFileTargetCache();
         } else {
           alreadySet = true;
         }

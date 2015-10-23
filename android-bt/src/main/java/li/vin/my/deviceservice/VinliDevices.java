@@ -1,5 +1,6 @@
 package li.vin.my.deviceservice;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -240,7 +241,7 @@ public final class VinliDevices {
       Subscriber<? super ConnectAttempt> subscriber, boolean errorIfNone) {
     if (subscriber.isUnsubscribed()) return true;
     Context context = connAttempt.context();
-    if (context != null && isBluetoothEnabled(context)) {
+    if (context != null && isBluetoothEnabled(context) && isLocationPermissionGranted(context)) {
       subscriber.onNext(connAttempt);
       subscriber.onCompleted();
       return true;
@@ -278,9 +279,11 @@ public final class VinliDevices {
       new Func1<ConnectAttempt, Observable<ConnectAttempt>>() {
         @Override public Observable<ConnectAttempt> call(final ConnectAttempt connAttempt) {
 
-          Context context = connAttempt.context();
+          final Context context = connAttempt.context();
           if (context == null) return Observable.error(new RuntimeException("no context."));
-          if (isBluetoothEnabled(context)) return Observable.just(connAttempt);
+          if (isBluetoothEnabled(context) && isLocationPermissionGranted(context)) {
+            return Observable.just(connAttempt);
+          }
 
           final AtomicInteger threshold = new AtomicInteger(30);
           final AtomicInteger attempts = new AtomicInteger();
@@ -300,24 +303,26 @@ public final class VinliDevices {
                 return;
               }
 
-              if (isBluetoothChangingState(ctx)) {
-                threshold.set(60);
-              }
+              if (!isBluetoothEnabled(context) && isLocationPermissionGranted(context)) {
+                if (isBluetoothChangingState(ctx)) {
+                  threshold.set(60);
+                }
 
-              // If Bluetooth is not initially enabled, we'll wait a little while before summoning
-              // UI to prompt for an enable to to see if it's just delayed coming on. the Bluetooth
-              // adapter's state can be a little bit laggy in some instances, and we don't want to
-              // prompt the user if not necessary, or even worse, fail outright because of an
-              // attempt to launch UI from a non-Activity context.
-              if (attempts.getAndIncrement() < threshold.get()) {
-                final Observable.OnSubscribe<ConnectAttempt> onSub = this;
-                handler.postDelayed(new Runnable() {
-                  @Override
-                  public void run() {
-                    onSub.call(subscriber);
-                  }
-                }, 50);
-                return;
+                // If Bluetooth is not initially enabled, we'll wait a little while before summoning
+                // UI to prompt for an enable to to see if it's just delayed coming on. the Bluetooth
+                // adapter's state can be a little bit laggy in some instances, and we don't want to
+                // prompt the user if not necessary, or even worse, fail outright because of an
+                // attempt to launch UI from a non-Activity context.
+                if (attempts.getAndIncrement() < threshold.get()) {
+                  final Observable.OnSubscribe<ConnectAttempt> onSub = this;
+                  handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                      onSub.call(subscriber);
+                    }
+                  }, 50);
+                  return;
+                }
               }
 
               if (!connAttempt.autoEnableBt) {
@@ -567,6 +572,18 @@ public final class VinliDevices {
           adapter.getState() == BluetoothAdapter.STATE_TURNING_ON;
     } catch (Exception e) {
       Log.e(TAG, "isBluetoothEnabled error", e);
+      return false;
+    }
+  }
+
+  /** Helper to determine if My Vinli has fine location permission. */
+  private static boolean isLocationPermissionGranted(@NonNull Context context) {
+    try {
+      return context.getPackageManager()
+          .checkPermission(Manifest.permission.ACCESS_FINE_LOCATION, "li.vin.my")
+          == PackageManager.PERMISSION_GRANTED;
+    } catch (Exception e) {
+      Log.e(TAG, "isLocationPermissionGranted error", e);
       return false;
     }
   }

@@ -7,7 +7,7 @@ Vinli Android Bluetooth SDK
 > And stay tuned for updates over the next few weeks as we bring more features to the SDK.
 
 An Android client for interacting with the Vinli bluetooth device from within your application.
-[Sample App](https://github.com/vinli/android-demo)
+[Sample App](https://github.com/vinli/android-techcrunch-demo)
 
 Build
 

@@ -9,11 +9,13 @@ Vinli Android Bluetooth SDK
 An Android client for interacting with the Vinli bluetooth device from within your application.
 [Sample App](https://github.com/vinli/android-techcrunch-demo)
 
-Build
+Download
+--------
 
------------
-
-[![Build Status](https://travis-ci.org/vinli/android-bt.svg?branch=master)](https://travis-ci.org/vinli/android-bt)
+You can also depend on this library through Gradle from jcenter:
+```groovy
+compile 'li.vin:android-bt:1.0.0-beta.11'
+```
 
 Conventions
 -----------
@@ -25,42 +27,3 @@ Docs
 ----
 
 ### [JavaDocs](http://vinli.github.io/android-bt/)
-
-Standard Flow
--------------
-### Obtain Device Unlock Key
-TODO: will be needed in the future, but dev devices are currently unlocked.
-
-### Subscribe to Data
-```java
-  List<Subscription> subscriptions = new ArrayList<>();
-  Fragment self = this;
-
-  final DeviceConnection deviceConn = VinliDevices.createDeviceConnection(getActivity(), "123123");
-
-  Subscription rpmSub = AppObservable
-    .bindFragment(self, deviceConn.observe(Params.RPM))
-    .subscribe(new Subscriber<Float>() {
-      @Override public void onCompleted() {
-        // end of stream reached
-      }
-
-      @Override public void onError(Throwable e) {
-        // and error happened
-      }
-
-      @Override public void onNext(Float val) {
-        // next value available
-      }
-    });
-
-  subscriptions.add(rpmSub);
-```
-
-### Unsubscribe When Finished
-```java
-  for (Subscription s : subscriptions) {
-    s.unsubscribe();
-  }
-  subscriptions.clear();
-```

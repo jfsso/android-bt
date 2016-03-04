@@ -30,8 +30,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -176,6 +179,64 @@ public final class VinliDevices {
   }
 
   /**
+   * Check whether or not the supplied scanRecord bytes match a cached, connectable Vinli device.
+   * If this returns true, it is safe to assume that a known Vinli device is powered on and nearby,
+   * and this device can be connected to immediately without the need to communicate with the My
+   * Vinli app. The supplied scanRecord bytes can be obtained by using
+   * {@link BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} - it is important to use
+   * the variant WITHOUT the serviceUuids filter search parameter to maximize compatibility.
+   */
+  @SuppressWarnings("unused")
+  public static boolean scanRecordContainsKnownDevice(@NonNull byte[] scanRecord,
+      @NonNull Context context) {
+    context = context.getApplicationContext();
+    TargetCache cache = targetCache();
+    cache.beginBatch(context);
+    String matchChipId = cache.getChipId();
+    cache.endBatch(context);
+    if (matchChipId == null) return false;
+
+    String partialChipId = parseChipIdFromGattName(scanRecord);
+    if (partialChipId != null) {
+      return chipIdsMatch(partialChipId, matchChipId);
+    }
+
+    try {
+      int startByte = 2;
+      boolean patternFound = false;
+      while (startByte <= 5) {
+        if (((int) scanRecord[startByte + 2] & 0xff) == 0x02 && //Identifies an iBeacon
+            ((int) scanRecord[startByte + 3] & 0xff) == 0x15) { //Identifies correct data length
+          patternFound = true;
+          break;
+        }
+        startByte++;
+      }
+
+      if (patternFound) {
+        //Convert to hex String
+        byte[] uuidBytes = new byte[16];
+        System.arraycopy(scanRecord, startByte + 4, uuidBytes, 0, 16);
+        String hexString = bytesToHex(uuidBytes);
+
+        //Here is your UUID
+        String uuid = hexString.substring(0, 8) + "-" +
+            hexString.substring(8, 12) + "-" +
+            hexString.substring(12, 16) + "-" +
+            hexString.substring(16, 20) + "-" +
+            hexString.substring(20, 32);
+
+        if (uuid.equals("E2C56DB5-DFFB-48D2-B060-D0F5A71096E0")) {
+          return chipIdsMatch(new String(scanRecord, startByte + 20, 4, "ASCII"), matchChipId);
+        }
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "parseVinliChipIdsFromScanRecord failed", e);
+    }
+    return false;
+  }
+
+  /**
    * Convenience to connect with autoEnableBt defaulted to true.
    *
    * @see #connect(Context, String, String, boolean, boolean)
@@ -231,6 +292,50 @@ public final class VinliDevices {
     connectResult.onNext(connectAttempt);
     mainInit.onNext(connectAttempt);
     return mainBtAndConnect;
+  }
+
+  @Nullable
+  private static String parseChipIdFromGattName(byte[] advertisedData) {
+
+    final ByteBuffer buffer = ByteBuffer.wrap(advertisedData).order(ByteOrder.LITTLE_ENDIAN);
+    while (buffer.remaining() > 2) {
+      byte length = buffer.get();
+      if (length == 0) {
+        break;
+      }
+
+      byte type = buffer.get();
+      switch (type) {
+        case 0x08: // DATA_TYPE_LOCAL_NAME_SHORT
+        case 0x09: // DATA_TYPE_LOCAL_NAME_COMPLETE
+          byte[] nameBytes = new byte[length - 1];
+          buffer.get(nameBytes, 0, length - 1);
+          String name = new String(nameBytes);
+          if (name.toLowerCase(Locale.US).contains("vinli") && (name =
+              name.substring(name.length() - 4)).matches("[0-9A-Fa-f]+") &&
+              !name.equals("230D")) {
+            return name;
+          }
+          return null;
+        default:
+          buffer.position(buffer.position() + length - 1);
+          break;
+      }
+    }
+
+    return null;
+  }
+
+  final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+
+  public static String bytesToHex(byte[] bytes) {
+    char[] hexChars = new char[bytes.length * 2];
+    for (int j = 0; j < bytes.length; j++) {
+      int v = bytes[j] & 0xFF;
+      hexChars[j * 2] = hexArray[v >>> 4];
+      hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+    }
+    return new String(hexChars);
   }
 
   private static final BehaviorSubject<ConnectAttempt> mainInit = BehaviorSubject.create();

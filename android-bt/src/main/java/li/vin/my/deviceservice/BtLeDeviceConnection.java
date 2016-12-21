@@ -22,7 +22,7 @@ import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.functions.Func2;
-import rx.internal.operators.OperatorReplayFix;
+import rx.internal.operators.OperatorReplay;
 
 /*package*/ class BtLeDeviceConnection extends BluetoothGattCallback implements DeviceConnection {
   private static final String TAG = BtLeDeviceConnection.class.getSimpleName();
@@ -101,8 +101,7 @@ import rx.internal.operators.OperatorReplayFix;
     return getOrCreateOp(opKey, new ObservableFactory<T>() {
       @Override public Observable<T> create() {
         Log.d(TAG, "creating param observable for " + (opLabel == null ? opKey : opLabel));
-        // TODO: use actual replay operator when past bugged rxjava version 1.0.14
-        return OperatorReplayFix.create(
+        return OperatorReplay.create(
             serviceObservable.flatMap(func.setCancelations(cancelations))
                 .retry(retryOnDisconnect)
                 .doOnUnsubscribe(func.cancelOpAction)
@@ -119,7 +118,7 @@ import rx.internal.operators.OperatorReplayFix;
                   }
                 }), 1).refCount();
         // ---
-        // just sharing means results throttled on distinct vals never 
+        // just sharing means results throttled on distinct vals never
         // come through for duplicate subscribers - replay instead.
         // ---
         //return serviceObservable.flatMap(func.setCancelations(cancelations))
